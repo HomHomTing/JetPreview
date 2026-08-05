@@ -1,0 +1,182 @@
+[
+  {
+    "iconKey": "A225",
+    "path": "assets/aircraft-icons/spec-extracted/A225.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "A320",
+    "path": "assets/aircraft-icons/spec-extracted/A320.png",
+    "width": 152,
+    "height": 138
+  },
+  {
+    "iconKey": "A330",
+    "path": "assets/aircraft-icons/spec-extracted/A330.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "A343",
+    "path": "assets/aircraft-icons/spec-extracted/A343.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "A346",
+    "path": "assets/aircraft-icons/spec-extracted/A346.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "A380",
+    "path": "assets/aircraft-icons/spec-extracted/A380.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "A3ST",
+    "path": "assets/aircraft-icons/spec-extracted/A3ST.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "ASW20",
+    "path": "assets/aircraft-icons/spec-extracted/ASW20.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "B736",
+    "path": "assets/aircraft-icons/spec-extracted/B736.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "B738",
+    "path": "assets/aircraft-icons/spec-extracted/B738.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "B747",
+    "path": "assets/aircraft-icons/spec-extracted/B747.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "B757",
+    "path": "assets/aircraft-icons/spec-extracted/B757.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "B767",
+    "path": "assets/aircraft-icons/spec-extracted/B767.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "B777",
+    "path": "assets/aircraft-icons/spec-extracted/B777.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "BALL",
+    "path": "assets/aircraft-icons/spec-extracted/BALL.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "C206",
+    "path": "assets/aircraft-icons/spec-extracted/C206.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "C303",
+    "path": "assets/aircraft-icons/spec-extracted/C303.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "CONC",
+    "path": "assets/aircraft-icons/spec-extracted/CONC.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "DRON",
+    "path": "assets/aircraft-icons/spec-extracted/DRON.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "EC",
+    "path": "assets/aircraft-icons/spec-extracted/EC.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "FGTR",
+    "path": "assets/aircraft-icons/spec-extracted/FGTR.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "FOKKER100",
+    "path": "assets/aircraft-icons/spec-extracted/FOKKER100.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "GRND",
+    "path": "assets/aircraft-icons/spec-extracted/GRND.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "ISS",
+    "path": "assets/aircraft-icons/spec-extracted/ISS.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "LJ60",
+    "path": "assets/aircraft-icons/spec-extracted/LJ60.png",
+    "width": 220,
+    "height": 228
+  },
+  {
+    "iconKey": "MD11",
+    "path": "assets/aircraft-icons/spec-extracted/MD11.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "Q300",
+    "path": "assets/aircraft-icons/spec-extracted/Q300.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "RJ85",
+    "path": "assets/aircraft-icons/spec-extracted/RJ85.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "SAT",
+    "path": "assets/aircraft-icons/spec-extracted/SAT.png",
+    "width": 182,
+    "height": 182
+  },
+  {
+    "iconKey": "SI2",
+    "path": "assets/aircraft-icons/spec-extracted/SI2.png",
+    "width": 182,
+    "height": 182
+  }
+]

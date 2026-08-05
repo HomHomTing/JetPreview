@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200">
+  <defs>
+    <filter id="previewShadow" x="-20%" y="-20%" width="150%" height="150%">
+      <feDropShadow dx="8" dy="14" stdDeviation="9" flood-color="#101820" flood-opacity=".22"/>
+    </filter>
+  </defs>
+  <rect width="1600" height="1120" fill="#f5f2e9"/>
+  <text x="64" y="72" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="34" font-weight="800" fill="#151b22">GL7T / GL8T / GA7C four-cabin business jet icon concepts</text>
+  <text x="64" y="112" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="17" fill="#68757f">Based on LJ60 FR24-style yellow scheme. Real ratio target: fuselage +11%, span +7% vs three-cabin reference; visual features are intentionally stronger.</text>
+  <g filter="url(#previewShadow)">
+    <rect x="64" y="154" width="720" height="150" rx="16" fill="#ffffff" stroke="#d8dbdd"/>
+    
+    <g transform="translate(114 180) scale(1.32)">
+      <path d="M32 4.5c2.8 0 4.6 13.4 5.3 19.7l17.8 7.2c1.1.4 1.8 1.4 1.8 2.6v3.3L38 33.6l-1 8.7 7.4 4.4V50l-10.1-2L32 59.5 29.7 48l-10.1 2v-3.3l7.4-4.4-1-8.7-18.9 3.7V34c0-1.2.7-2.2 1.8-2.6l17.8-7.2c.7-6.3 2.5-19.7 5.3-19.7Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+    </g>
+    <text x="156.24" y="290.88" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="16" font-weight="700" fill="#151b22" text-anchor="middle">LJ60 baseline</text>
+    <text x="156.24" y="318.6" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="12" fill="#68757f" text-anchor="middle">generic business jet</text>
+  
+    
+    <g transform="translate(328 172) scale(1.42)">
+      <path d="M27.7 24.7 5.5 33.9c-1 .4-1.7 1.4-1.7 2.5v3.3l24.1-4.5Zm8.6 0 22.2 9.2c1 .4 1.7 1.4 1.7 2.5v3.3l-24.1-4.5Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+      <path d="M27.5 47.2 16.4 51.3v3.5l12.8-2.2Zm9 0 11.1 4.1v3.5l-12.8-2.2Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+      <path d="M32 1.6c3 0 4.7 14.7 5.2 22.6v16c0 3.2-1 6-2.6 8.6l-.7 4.8 6.2 4.6v3.3L34 59.8 32 62.5l-2-2.7-6.1 1.7v-3.3l6.2-4.6-.7-4.8c-1.6-2.6-2.6-5.4-2.6-8.6v-16c.5-7.9 2.2-22.6 5.2-22.6Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+      <path d="M22.8 36.8c2.1-.5 4.1 1.3 4.4 4l.6 5.5c-1.2 1.2-3.8 1.4-5.1.1l-1.1-6.6c-.2-1.4.3-2.6 1.2-3Zm18.4 0c-2.1-.5-4.1 1.3-4.4 4l-.6 5.5c1.2 1.2 3.8 1.4 5.1.1l1.1-6.6c.2-1.4-.3-2.6-1.2-3Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+    </g>
+    <text x="373.44" y="291.28" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="16" font-weight="700" fill="#151b22" text-anchor="middle">Four-cabin target</text>
+    <text x="373.44" y="321.1" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="12" fill="#68757f" text-anchor="middle">+11% length / +7% span</text>
+  
+    <line x1="286" y1="180" x2="286" y2="280" stroke="#d8dbdd"/>
+    <text x="546" y="205" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="16" font-weight="700" fill="#151b22">Design emphasis</text>
+    <text x="546" y="232" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14" fill="#68757f">Longer cabin read</text>
+    <text x="546" y="254" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14" fill="#68757f">Aft-mounted turbofan pods</text>
+    <text x="546" y="276" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14" fill="#68757f">Sharper flagship tail/wing-tip signature</text>
+  </g>
+  <g filter="url(#previewShadow)">
+    
+      <g>
+        <rect x="64" y="354" width="430" height="314" rx="18" fill="#ffffff" stroke="#d8dbdd"/>
+        <rect x="86" y="382" width="386" height="138" rx="10" fill="#759ca1"/>
+        <path d="M86 476 C 172 450, 226 516, 312 472 S 424 448, 472 486" fill="none" stroke="#4e747c" stroke-width="13" stroke-opacity=".45"/>
+        <g transform="translate(164 422) scale(.78) rotate(-28 32 32)">
+          <path d="M32 4.5c2.8 0 4.6 13.4 5.3 19.7l17.8 7.2c1.1.4 1.8 1.4 1.8 2.6v3.3L38 33.6l-1 8.7 7.4 4.4V50l-10.1-2L32 59.5 29.7 48l-10.1 2v-3.3l7.4-4.4-1-8.7-18.9 3.7V34c0-1.2.7-2.2 1.8-2.6l17.8-7.2c.7-6.3 2.5-19.7 5.3-19.7Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill" opacity=".72"/>
+        </g>
+        <g transform="translate(306 406) scale(.88) rotate(-28 32 32)">
+          <path d="M27.7 24.7 5.5 33.9c-1 .4-1.7 1.4-1.7 2.5v3.3l24.1-4.5Zm8.6 0 22.2 9.2c1 .4 1.7 1.4 1.7 2.5v3.3l-24.1-4.5Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+          <path d="M27.5 47.2 16.4 51.3v3.5l12.8-2.2Zm9 0 11.1 4.1v3.5l-12.8-2.2Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+          <path d="M32 1.6c3 0 4.7 14.7 5.2 22.6v16c0 3.2-1 6-2.6 8.6l-.7 4.8 6.2 4.6v3.3L34 59.8 32 62.5l-2-2.7-6.1 1.7v-3.3l6.2-4.6-.7-4.8c-1.6-2.6-2.6-5.4-2.6-8.6v-16c.5-7.9 2.2-22.6 5.2-22.6Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+          <path d="M22.8 36.8c2.1-.5 4.1 1.3 4.4 4l.6 5.5c-1.2 1.2-3.8 1.4-5.1.1l-1.1-6.6c-.2-1.4.3-2.6 1.2-3Zm18.4 0c-2.1-.5-4.1 1.3-4.4 4l-.6 5.5c1.2 1.2 3.8 1.4 5.1.1l1.1-6.6c.2-1.4-.3-2.6-1.2-3Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+        </g>
+        <text x="88" y="552" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="22" font-weight="750" fill="#151b22">A · Balanced four-cabin</text>
+        <text x="88" y="580" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14" font-weight="400" fill="#68757f" text-anchor="start">11% longer cabin, 7% broader span, rear pods</text>
+<text x="88" y="598" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14" font-weight="400" fill="#68757f" text-anchor="start">readable but restrained.</text>
+        <text x="88" y="640" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="13" fill="#68757f">Map display target: 31px; codes: GL7T / GL8T / GA7C</text>
+      </g>
+
+      <g>
+        <rect x="556" y="354" width="430" height="314" rx="18" fill="#ffffff" stroke="#d8dbdd"/>
+        <rect x="578" y="382" width="386" height="138" rx="10" fill="#759ca1"/>
+        <path d="M578 476 C 664 450, 718 516, 804 472 S 916 448, 964 486" fill="none" stroke="#4e747c" stroke-width="13" stroke-opacity=".45"/>
+        <g transform="translate(656 422) scale(.78) rotate(-28 32 32)">
+          <path d="M32 4.5c2.8 0 4.6 13.4 5.3 19.7l17.8 7.2c1.1.4 1.8 1.4 1.8 2.6v3.3L38 33.6l-1 8.7 7.4 4.4V50l-10.1-2L32 59.5 29.7 48l-10.1 2v-3.3l7.4-4.4-1-8.7-18.9 3.7V34c0-1.2.7-2.2 1.8-2.6l17.8-7.2c.7-6.3 2.5-19.7 5.3-19.7Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill" opacity=".72"/>
+        </g>
+        <g transform="translate(798 406) scale(.88) rotate(-28 32 32)">
+          <path d="M27.8 25.8 6 35c-1 .4-1.7 1.4-1.7 2.6v3.5l24-5.4Zm8.4 0 21.8 9.2c1 .4 1.7 1.4 1.7 2.6v3.5l-24-5.4Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+          <path d="M27.6 48.4 14.8 53.4v3.6l14.7-3Zm8.8 0 12.8 5v3.6l-14.7-3Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+          <path d="M32 1.8c3.2 0 4.9 15.6 5.2 23.5v12.8c0 5.6-1 9.4-3 12.2l-.5 4.3 5.5 4.1v3.4l-5.8-1.8L32 62.6l-1.4-2.3-5.8 1.8v-3.4l5.5-4.1-.5-4.3c-2-2.8-3-6.6-3-12.2V25.3c.3-7.9 2-23.5 5.2-23.5Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+          <path d="M21.2 34.6c2.9-.8 5.3 1.5 5.7 5.2l.8 8.2c-1.3 1.8-5.4 2-7 .3l-1.4-9.3c-.2-2 .5-3.8 1.9-4.4Zm21.6 0c-2.9-.8-5.3 1.5-5.7 5.2l-.8 8.2c1.3 1.8 5.4 2 7 .3l1.4-9.3c.2-2-.5-3.8-1.9-4.4Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+        </g>
+        <text x="580" y="552" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="22" font-weight="750" fill="#151b22">B · Heavy tail-engine signature</text>
+        <text x="580" y="580" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14" font-weight="400" fill="#68757f" text-anchor="start">Engine pods enlarged and dropped aft, so the</text>
+<text x="580" y="598" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14" font-weight="400" fill="#68757f" text-anchor="start">silhouette is not just a scaled LJ60.</text>
+        <text x="580" y="640" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="13" fill="#68757f">Map display target: 31.5px; codes: GL7T / GL8T / GA7C</text>
+      </g>
+
+      <g>
+        <rect x="1048" y="354" width="430" height="314" rx="18" fill="#ffffff" stroke="#d8dbdd"/>
+        <rect x="1070" y="382" width="386" height="138" rx="10" fill="#759ca1"/>
+        <path d="M1070 476 C 1156 450, 1210 516, 1296 472 S 1408 448, 1456 486" fill="none" stroke="#4e747c" stroke-width="13" stroke-opacity=".45"/>
+        <g transform="translate(1148 422) scale(.78) rotate(-28 32 32)">
+          <path d="M32 4.5c2.8 0 4.6 13.4 5.3 19.7l17.8 7.2c1.1.4 1.8 1.4 1.8 2.6v3.3L38 33.6l-1 8.7 7.4 4.4V50l-10.1-2L32 59.5 29.7 48l-10.1 2v-3.3l7.4-4.4-1-8.7-18.9 3.7V34c0-1.2.7-2.2 1.8-2.6l17.8-7.2c.7-6.3 2.5-19.7 5.3-19.7Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill" opacity=".72"/>
+        </g>
+        <g transform="translate(1290 406) scale(.88) rotate(-28 32 32)">
+          <path d="M27.6 25.3 6.8 32.7c-1.1.4-1.9 1.4-2 2.6l-.3 3.1 23.8-3.6 1.5-2.2-1.6-1.1Zm8.8 0 20.8 7.4c1.1.4 1.9 1.4 2 2.6l.3 3.1-23.8-3.6-1.5-2.2 1.6-1.1Zm-22.5 5.6-7.2-.9 1.2 3.4 6.2 1Zm36.2 0 7.2-.9-1.2 3.4-6.2 1Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+          <path d="M27.6 47.8 18 50.8v3.4l11.5-1.9Zm8.8 0 9.6 3v3.4l-11.5-1.9Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+          <path d="M32 1.9c2.8 0 4.5 14.9 5.2 23.5v15.4c0 3.3-1.1 6.2-2.8 8.7l-.7 4.5 6.4 4.4v3.2l-6.2-1.7L32 62.2l-1.9-2.3-6.2 1.7v-3.2l6.4-4.4-.7-4.5c-1.7-2.5-2.8-5.4-2.8-8.7V25.4c.7-8.6 2.4-23.5 5.2-23.5Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+          <path d="M23 38.2c1.8-.6 3.4.8 3.7 3.1l.6 5.4c-1 1-3.5 1.2-4.7.2l-1-5.9c-.2-1.3.4-2.4 1.4-2.8Zm18 0c-1.8-.6-3.4.8-3.7 3.1l-.6 5.4c1 1 3.5 1.2 4.7.2l1-5.9c.2-1.3-.4-2.4-1.4-2.8Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+        </g>
+        <text x="1072" y="552" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="22" font-weight="750" fill="#151b22">C · Gulfstream clean winglet</text>
+        <text x="1072" y="580" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14" font-weight="400" fill="#68757f" text-anchor="start">Sharper swept wing and canted tips, with slimmer</text>
+<text x="1072" y="598" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14" font-weight="400" fill="#68757f" text-anchor="start">rear engines and a very clean fuselage.</text>
+        <text x="1072" y="640" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="13" fill="#68757f">Map display target: 31px; codes: GL7T / GL8T / GA7C</text>
+      </g>
+
+      <g>
+        <rect x="64" y="734" width="430" height="314" rx="18" fill="#ffffff" stroke="#d8dbdd"/>
+        <rect x="86" y="762" width="386" height="138" rx="10" fill="#759ca1"/>
+        <path d="M86 856 C 172 830, 226 896, 312 852 S 424 828, 472 866" fill="none" stroke="#4e747c" stroke-width="13" stroke-opacity=".45"/>
+        <g transform="translate(164 802) scale(.78) rotate(-28 32 32)">
+          <path d="M32 4.5c2.8 0 4.6 13.4 5.3 19.7l17.8 7.2c1.1.4 1.8 1.4 1.8 2.6v3.3L38 33.6l-1 8.7 7.4 4.4V50l-10.1-2L32 59.5 29.7 48l-10.1 2v-3.3l7.4-4.4-1-8.7-18.9 3.7V34c0-1.2.7-2.2 1.8-2.6l17.8-7.2c.7-6.3 2.5-19.7 5.3-19.7Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill" opacity=".72"/>
+        </g>
+        <g transform="translate(306 786) scale(.88) rotate(-28 32 32)">
+          <path d="M27.5 27.2 4.7 36.2c-.9.4-1.5 1.3-1.5 2.3v3.2l24.9-5.7 2-2.9Zm9 0 22.8 9c.9.4 1.5 1.3 1.5 2.3v3.2L35.9 36l-2-2.9Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+          <path d="M27.2 49.6 15.2 54.1v3.5l14-2.6Zm9.6 0 12 4.5v3.5l-14-2.6Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+          <path d="M32 1.4c3.4 0 5.1 16.2 5.2 24.9v13.4c0 4.1-1.1 7.7-3.2 10.6l-.4 4.2 6.7 4.6v3.1l-6.9-1.8-1.4 2.3-1.4-2.3-6.9 1.8v-3.1l6.7-4.6-.4-4.2c-2.1-2.9-3.2-6.5-3.2-10.6V26.3c.1-8.7 1.8-24.9 5.2-24.9Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+          <path d="M21.4 38c2.4-.9 4.7 1 5 4.3l.6 6.6c-1.4 1.4-4.5 1.4-5.9 0L20 41.7c-.2-1.6.4-3.1 1.4-3.7Zm21.2 0c-2.4-.9-4.7 1-5 4.3l-.6 6.6c1.4 1.4 4.5 1.4 5.9 0l1.1-7.2c.2-1.6-.4-3.1-1.4-3.7Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+        </g>
+        <text x="88" y="932" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="22" font-weight="750" fill="#151b22">D · Bombardier smooth-flex</text>
+        <text x="88" y="960" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14" font-weight="400" fill="#68757f" text-anchor="start">Longest cabin read, wings slightly aft and more</text>
+<text x="88" y="978" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14" font-weight="400" fill="#68757f" text-anchor="start">elastic, engines set wider from fuselage.</text>
+        <text x="88" y="1020" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="13" fill="#68757f">Map display target: 31.2px; codes: GL7T / GL8T / GA7C</text>
+      </g>
+
+      <g>
+        <rect x="556" y="734" width="430" height="314" rx="18" fill="#ffffff" stroke="#d8dbdd"/>
+        <rect x="578" y="762" width="386" height="138" rx="10" fill="#759ca1"/>
+        <path d="M578 856 C 664 830, 718 896, 804 852 S 916 828, 964 866" fill="none" stroke="#4e747c" stroke-width="13" stroke-opacity=".45"/>
+        <g transform="translate(656 802) scale(.78) rotate(-28 32 32)">
+          <path d="M32 4.5c2.8 0 4.6 13.4 5.3 19.7l17.8 7.2c1.1.4 1.8 1.4 1.8 2.6v3.3L38 33.6l-1 8.7 7.4 4.4V50l-10.1-2L32 59.5 29.7 48l-10.1 2v-3.3l7.4-4.4-1-8.7-18.9 3.7V34c0-1.2.7-2.2 1.8-2.6l17.8-7.2c.7-6.3 2.5-19.7 5.3-19.7Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill" opacity=".72"/>
+        </g>
+        <g transform="translate(798 786) scale(.88) rotate(-28 32 32)">
+          <path d="M27.4 25.9 4.5 35.2c-1.1.4-1.8 1.5-1.8 2.7v3.9l25.8-5.6Zm9.2 0 22.9 9.3c1.1.4 1.8 1.5 1.8 2.7v3.9l-25.8-5.6Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+          <path d="M26.9 48.2 14.2 52.9v4l15.3-3.2Zm10.2 0 12.7 4.7v4l-15.3-3.2Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+          <path d="M32 1.2c3.5 0 5.3 16.3 5.6 24.8v13.8c0 4.1-1.3 7.8-3.5 10.8l-.3 3.9 7 5v3.4l-7.5-2.4L32 63l-1.3-2.5-7.5 2.4v-3.4l7-5-.3-3.9c-2.2-3-3.5-6.7-3.5-10.8V26c.3-8.5 2.1-24.8 5.6-24.8Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+          <path d="M20.8 36.6c2.9-.9 5.5 1.4 5.9 5.4l.8 7.1c-1.5 1.8-5.5 1.9-7.2.1L19.1 41c-.3-2 .4-3.8 1.7-4.4Zm22.4 0c-2.9-.9-5.5 1.4-5.9 5.4l-.8 7.1c1.5 1.8 5.5 1.9 7.2.1l1.2-8.2c.3-2-.4-3.8-1.7-4.4Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+        </g>
+        <text x="580" y="932" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="22" font-weight="750" fill="#151b22">E · Map-readability bold</text>
+        <text x="580" y="960" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14" font-weight="400" fill="#68757f" text-anchor="start">Highest contrast and simplest silhouette,</text>
+<text x="580" y="978" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14" font-weight="400" fill="#68757f" text-anchor="start">sacrificing a little realism for small map sizes.</text>
+        <text x="580" y="1020" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="13" fill="#68757f">Map display target: 32px; codes: GL7T / GL8T / GA7C</text>
+      </g>
+  </g>
+</svg>

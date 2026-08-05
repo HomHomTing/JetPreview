@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GL7T / GL8T / GA7C icon concepts</title>
+  <style>
+    :root { color-scheme: light; --yellow:#FDB813; --ink:#151b22; --muted:#68757f; --stroke:#121920; --map:#759ca1; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f2e9; color: var(--ink); }
+    main { max-width: 1380px; margin: 0 auto; padding: 36px 28px 48px; }
+    h1 { margin: 0 0 8px; font-size: 30px; line-height: 1.15; }
+    .lead { margin: 0 0 24px; color: var(--muted); font-size: 16px; }
+    .overview { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .panel, .card { background: #fff; border: 1px solid #d8dbdd; border-radius: 8px; box-shadow: 0 12px 26px rgba(17, 25, 32, .09); }
+    .panel { padding: 18px 20px; }
+    .panel h2 { margin: 0 0 10px; font-size: 17px; }
+    .panel p { margin: 6px 0; color: var(--muted); }
+    .grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+    .card { padding: 14px; }
+    .map-chip { position: relative; height: 154px; overflow: hidden; border-radius: 6px; background: var(--map); }
+    .map-chip:before { content: ""; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255,255,255,.16), transparent 42%), radial-gradient(circle at 24% 68%, rgba(54,88,94,.42) 0 16%, transparent 17%); }
+    .map-chip:after { content: ""; position: absolute; left: -18%; right: -18%; top: 54%; height: 18px; transform: rotate(-24deg); background: rgba(56,81,88,.35); border-radius: 99px; }
+    .baseline, .candidate { position: absolute; display: grid; place-items: center; z-index: 1; filter: drop-shadow(7px 10px 7px rgba(18,25,32,.38)); }
+    .baseline { left: 38px; top: 56px; width: 28px; height: 28px; opacity: .62; transform: rotate(-28deg); }
+    .candidate { right: 58px; top: 42px; width: 38px; height: 38px; transform: rotate(-28deg); }
+    img { width: 100%; height: 100%; object-fit: contain; }
+    h2 { margin: 12px 0 6px; font-size: 16px; line-height: 1.2; }
+    p { margin: 0; color: var(--muted); }
+    .meta { margin-top: 10px; font-size: 12px; }
+    .row { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+    a { color: #174f86; font-weight: 700; text-decoration: none; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>GL7T / GL8T / GA7C 四客舱旗舰公务机 icon 方案</h1>
+  <p class="lead">基于现有 LJ60 方案，只做候选预览，不更新首页地图和控制台映射。</p>
+  <section class="overview">
+    <div class="panel">
+      <h2>尺寸逻辑</h2>
+      <p>四客舱组：Global 7500 / Global 8000 / Gulfstream G700，均值约 33.7 m 机长、31.6 m 翼展。</p>
+      <p>三客舱参考：Global 6000 / Gulfstream G650ER，均值约 30.4 m 机长、29.5 m 翼展。</p>
+      <p>图标目标：相对三客舱参考，机身约 +11%，翼展约 +7%。</p>
+    </div>
+    <div class="panel">
+      <h2>视觉逻辑</h2>
+      <p>保持 FR24 黄、深色描边、低位投影。</p>
+      <p>为了避免“只是放大”，五版都强化了后段机身、尾吊发动机、翼梢/尾翼识别点。</p>
+    </div>
+  </section>
+  <section class="grid">
+    <article class="card">
+  <div class="map-chip">
+    <span class="baseline"><img src="../../assets/aircraft-icons/fr24-template-shadow-fr24yellow/LJ60.png" alt=""></span>
+    <span class="candidate"><img src="png_512/concept-1.png" alt=""></span>
+  </div>
+  <div class="row">
+    <div>
+      <h2>A · Balanced four-cabin</h2>
+      <p>11% longer cabin, 7% broader span, rear pods readable but restrained.</p>
+      <p class="meta">Display target 31px · GL7T / GL8T / GA7C</p>
+    </div>
+    <a href="svg/concept-1.svg">SVG</a>
+  </div>
+</article>
+<article class="card">
+  <div class="map-chip">
+    <span class="baseline"><img src="../../assets/aircraft-icons/fr24-template-shadow-fr24yellow/LJ60.png" alt=""></span>
+    <span class="candidate"><img src="png_512/concept-2.png" alt=""></span>
+  </div>
+  <div class="row">
+    <div>
+      <h2>B · Heavy tail-engine signature</h2>
+      <p>Engine pods enlarged and dropped aft, so the silhouette is not just a scaled LJ60.</p>
+      <p class="meta">Display target 31.5px · GL7T / GL8T / GA7C</p>
+    </div>
+    <a href="svg/concept-2.svg">SVG</a>
+  </div>
+</article>
+<article class="card">
+  <div class="map-chip">
+    <span class="baseline"><img src="../../assets/aircraft-icons/fr24-template-shadow-fr24yellow/LJ60.png" alt=""></span>
+    <span class="candidate"><img src="png_512/concept-3.png" alt=""></span>
+  </div>
+  <div class="row">
+    <div>
+      <h2>C · Gulfstream clean winglet</h2>
+      <p>Sharper swept wing and canted tips, with slimmer rear engines and a very clean fuselage.</p>
+      <p class="meta">Display target 31px · GL7T / GL8T / GA7C</p>
+    </div>
+    <a href="svg/concept-3.svg">SVG</a>
+  </div>
+</article>
+<article class="card">
+  <div class="map-chip">
+    <span class="baseline"><img src="../../assets/aircraft-icons/fr24-template-shadow-fr24yellow/LJ60.png" alt=""></span>
+    <span class="candidate"><img src="png_512/concept-4.png" alt=""></span>
+  </div>
+  <div class="row">
+    <div>
+      <h2>D · Bombardier smooth-flex</h2>
+      <p>Longest cabin read, wings slightly aft and more elastic, engines set wider from fuselage.</p>
+      <p class="meta">Display target 31.2px · GL7T / GL8T / GA7C</p>
+    </div>
+    <a href="svg/concept-4.svg">SVG</a>
+  </div>
+</article>
+<article class="card">
+  <div class="map-chip">
+    <span class="baseline"><img src="../../assets/aircraft-icons/fr24-template-shadow-fr24yellow/LJ60.png" alt=""></span>
+    <span class="candidate"><img src="png_512/concept-5.png" alt=""></span>
+  </div>
+  <div class="row">
+    <div>
+      <h2>E · Map-readability bold</h2>
+      <p>Highest contrast and simplest silhouette, sacrificing a little realism for small map sizes.</p>
+      <p class="meta">Display target 32px · GL7T / GL8T / GA7C</p>
+    </div>
+    <a href="svg/concept-5.svg">SVG</a>
+  </div>
+</article>
+  </section>
+</main>
+</body>
+</html>

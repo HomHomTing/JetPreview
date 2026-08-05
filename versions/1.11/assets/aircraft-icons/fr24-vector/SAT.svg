@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="4096" viewBox="0 0 64 64" fill="none" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
+  <title>SAT</title>
+  <path d="M25 23h14v14H25V23Zm-16-8 11 6.4-2.5 4.3-11-6.4L9 15Zm46 0 2.5 4.3-11 6.4-2.5-4.3L55 15ZM6.5 44.7l11-6.4 2.5 4.3-11 6.4-2.5-4.3Zm51 0L55 49l-11-6.4 2.5-4.3 11 6.4ZM29 27v6h6v-6h-6Z" fill="#f8c400" stroke="#131920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+  <path d="M25 23h14v14H25V23Zm-16-8 11 6.4-2.5 4.3-11-6.4L9 15Zm46 0 2.5 4.3-11 6.4-2.5-4.3L55 15ZM6.5 44.7l11-6.4 2.5 4.3-11 6.4-2.5-4.3Zm51 0L55 49l-11-6.4 2.5-4.3 11 6.4ZM29 27v6h6v-6h-6Z" fill="none" stroke="#ffe16a" stroke-opacity="0.22" stroke-width="0.32" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

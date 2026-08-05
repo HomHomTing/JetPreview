@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="4096" viewBox="0 0 64 64" fill="none" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
+  <title>GL7T / GL8T / GA7C B · Heavy tail-engine signature</title>
+  <defs>
+    <filter id="shadow" x="-25%" y="-25%" width="155%" height="165%">
+      <feDropShadow dx="1.45" dy="2.55" stdDeviation="1.15" flood-color="#121920" flood-opacity="0.44"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <path d="M27.8 25.8 6 35c-1 .4-1.7 1.4-1.7 2.6v3.5l24-5.4Zm8.4 0 21.8 9.2c1 .4 1.7 1.4 1.7 2.6v3.5l-24-5.4Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+    <path d="M27.6 48.4 14.8 53.4v3.6l14.7-3Zm8.8 0 12.8 5v3.6l-14.7-3Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+    <path d="M32 1.8c3.2 0 4.9 15.6 5.2 23.5v12.8c0 5.6-1 9.4-3 12.2l-.5 4.3 5.5 4.1v3.4l-5.8-1.8L32 62.6l-1.4-2.3-5.8 1.8v-3.4l5.5-4.1-.5-4.3c-2-2.8-3-6.6-3-12.2V25.3c.3-7.9 2-23.5 5.2-23.5Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+    <path d="M21.2 34.6c2.9-.8 5.3 1.5 5.7 5.2l.8 8.2c-1.3 1.8-5.4 2-7 .3l-1.4-9.3c-.2-2 .5-3.8 1.9-4.4Zm21.6 0c-2.9-.8-5.3 1.5-5.7 5.2l-.8 8.2c1.3 1.8 5.4 2 7 .3l1.4-9.3c.2-2-.5-3.8-1.9-4.4Z" fill="#FDB813" stroke="#121920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+    <path d="M32 1.8c3.2 0 4.9 15.6 5.2 23.5v12.8c0 5.6-1 9.4-3 12.2l-.5 4.3 5.5 4.1v3.4l-5.8-1.8L32 62.6l-1.4-2.3-5.8 1.8v-3.4l5.5-4.1-.5-4.3c-2-2.8-3-6.6-3-12.2V25.3c.3-7.9 2-23.5 5.2-23.5Z" fill="none" stroke="#FFE16A" stroke-opacity="0.24" stroke-width="0.35" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M21.2 34.6c2.9-.8 5.3 1.5 5.7 5.2l.8 8.2c-1.3 1.8-5.4 2-7 .3l-1.4-9.3c-.2-2 .5-3.8 1.9-4.4Zm21.6 0c-2.9-.8-5.3 1.5-5.7 5.2l-.8 8.2c1.3 1.8 5.4 2 7 .3l1.4-9.3c.2-2-.5-3.8-1.9-4.4Z" fill="none" stroke="#FFE16A" stroke-opacity="0.22" stroke-width="0.35" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+</svg>
