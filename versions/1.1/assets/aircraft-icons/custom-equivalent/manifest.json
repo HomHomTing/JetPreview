@@ -1,0 +1,44 @@
+{
+  "sourceMode": "custom-equivalent-assets",
+  "license": "owned-custom",
+  "sourceVersion": "1.1.0",
+  "viewBox": "0 0 64 64",
+  "anchor": {
+    "x": 32,
+    "y": 32
+  },
+  "strokePolicy": "dark-stroke-default-white-stroke-selected",
+  "colorPolicy": {
+    "defaultFill": "#ffd21c",
+    "defaultStroke": "rgba(16, 16, 16, 0.86)",
+    "selectedFill": "#ff4b32",
+    "selectedStroke": "rgba(255, 255, 255, 0.94)"
+  },
+  "sizeClasses": [
+    {
+      "id": "light",
+      "file": "light.svg",
+      "description": "Short fuselage and narrow wings for light business jets."
+    },
+    {
+      "id": "midsize",
+      "file": "midsize.svg",
+      "description": "Medium fuselage and moderate swept wing for midsize business jets."
+    },
+    {
+      "id": "super-midsize",
+      "file": "super-midsize.svg",
+      "description": "Longer body and broader swept wing for super midsize business jets."
+    },
+    {
+      "id": "long-range",
+      "file": "long-range.svg",
+      "description": "Long fuselage and wide wing silhouette for long range business jets."
+    },
+    {
+      "id": "ultra-long",
+      "file": "ultra-long.svg",
+      "description": "Largest business jet silhouette with extended fuselage and wings."
+    }
+  ]
+}

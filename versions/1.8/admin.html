@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Aircraft Icon Control Console 1.7</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body class="admin-page">
+  <svg class="ui-symbols" aria-hidden="true">
+    <symbol id="icon-dashboard" viewBox="0 0 24 24">
+      <path d="M3 13h8V3H3v10Zm10 8h8V3h-8v18ZM3 21h8v-6H3v6Z"/>
+    </symbol>
+    <symbol id="icon-plane" viewBox="0 0 24 24">
+      <path d="M12 2.5c1.1 0 1.9 4.7 2.2 7l6.8 2.7c.5.2.8.6.8 1.1v1.5l-7.3-1.5-.4 3.7 2.8 1.8v1.5L13 19.4 12 22l-1-2.6-3.9.9v-1.5L9.9 17l-.4-3.7-7.3 1.5v-1.5c0-.5.3-.9.8-1.1l6.8-2.7c.3-2.3 1.1-7 2.2-7Z"/>
+    </symbol>
+    <symbol id="icon-table" viewBox="0 0 24 24">
+      <path d="M4 4h16v16H4V4Zm2 4h12V6H6v2Zm0 5h5v-3H6v3Zm7 0h5v-3h-5v3Zm-7 5h5v-3H6v3Zm7 0h5v-3h-5v3Z"/>
+    </symbol>
+    <symbol id="icon-eye" viewBox="0 0 24 24">
+      <path d="M12 5c5.2 0 8.8 5.2 9.4 6.2a1.5 1.5 0 0 1 0 1.6C20.8 13.8 17.2 19 12 19s-8.8-5.2-9.4-6.2a1.5 1.5 0 0 1 0-1.6C3.2 10.2 6.8 5 12 5Zm0 2C7.9 7 5 11 4.4 12c.6 1 3.5 5 7.6 5s7-4 7.6-5c-.6-1-3.5-5-7.6-5Zm0 2.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6Z"/>
+    </symbol>
+    <symbol id="icon-publish" viewBox="0 0 24 24">
+      <path d="M12 2.5 5 9.6h4.2V16h5.6V9.6H19L12 2.5ZM5 18h14v3H5v-3Z"/>
+    </symbol>
+    <symbol id="icon-history" viewBox="0 0 24 24">
+      <path d="M12 4a8 8 0 1 1-7.2 4.5H2.3A10 10 0 1 0 4 5.1V2H2v6h6V6H5.5A8 8 0 0 1 12 4Zm-1 3h2v5.2l4 2.4-1 1.7-5-3V7Z"/>
+    </symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24">
+      <path d="M10.7 2h2.6l.6 2.4c.7.2 1.3.5 1.9.8l2.1-1.3 1.8 1.8-1.3 2.1c.4.6.6 1.2.8 1.9l2.4.6v2.6l-2.4.6c-.2.7-.5 1.3-.8 1.9l1.3 2.1-1.8 1.8-2.1-1.3c-.6.4-1.2.6-1.9.8l-.6 2.4h-2.6l-.6-2.4c-.7-.2-1.3-.5-1.9-.8l-2.1 1.3-1.8-1.8 1.3-2.1c-.4-.6-.6-1.2-.8-1.9L2.4 13v-2.6l2.4-.6c.2-.7.5-1.3.8-1.9L4.3 5.8l1.8-1.8 2.1 1.3c.6-.4 1.2-.6 1.9-.8L10.7 2Zm1.3 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/>
+    </symbol>
+    <symbol id="icon-search" viewBox="0 0 24 24">
+      <path d="M10.5 4a6.5 6.5 0 0 1 5.1 10.5l4 4-1.4 1.4-4-4A6.5 6.5 0 1 1 10.5 4Zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Z"/>
+    </symbol>
+    <symbol id="icon-save" viewBox="0 0 24 24">
+      <path d="M5 3h12l2 2v16H5V3Zm2 2v5h9V5H7Zm1 10v4h8v-4H8Zm1-9h5v3H9V6Z"/>
+    </symbol>
+    <symbol id="icon-plus" viewBox="0 0 24 24">
+      <path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z"/>
+    </symbol>
+    <symbol id="icon-download" viewBox="0 0 24 24">
+      <path d="M11 3h2v9l3.5-3.5 1.4 1.4-5.9 5.9-5.9-5.9 1.4-1.4L11 12V3ZM5 19h14v2H5v-2Z"/>
+    </symbol>
+    <symbol id="icon-upload" viewBox="0 0 24 24">
+      <path d="M11 15h2V6l3.5 3.5 1.4-1.4L12 2.2 6.1 8.1l1.4 1.4L11 6v9ZM5 19h14v2H5v-2Z"/>
+    </symbol>
+    <symbol id="icon-copy" viewBox="0 0 24 24">
+      <path d="M8 8h11v13H8V8Zm2 2v9h7v-9h-7ZM5 3h11v3h-2V5H7v9h-2V3Z"/>
+    </symbol>
+    <symbol id="icon-trash" viewBox="0 0 24 24">
+      <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-2 6h10l-.7 12H7.7L7 9Zm3 2 .2 8h1.6l-.2-8H10Zm4 0-.2 8h-1.6l.2-8H14Z"/>
+    </symbol>
+  </svg>
+
+  <div class="admin-app">
+    <aside class="sidebar">
+      <a class="product-lockup" href="admin.html" aria-label="打开图标控制台">
+        <span class="product-lockup__badge">1.7</span>
+        <span>
+          <strong>图标控制台</strong>
+          <small>Aircraft Icon Ops</small>
+        </span>
+      </a>
+
+      <nav class="sidebar-nav" id="adminNav" aria-label="后台导航">
+        <button class="nav-item" type="button" data-view="dashboard"><svg><use href="#icon-dashboard"></use></svg><span>Dashboard</span></button>
+        <button class="nav-item" type="button" data-view="icons"><svg><use href="#icon-plane"></use></svg><span>Icon Library</span></button>
+        <button class="nav-item" type="button" data-view="mappings"><svg><use href="#icon-table"></use></svg><span>Type Mappings</span></button>
+        <button class="nav-item" type="button" data-view="preview"><svg><use href="#icon-eye"></use></svg><span>Preview Lab</span></button>
+        <button class="nav-item" type="button" data-view="publish"><svg><use href="#icon-publish"></use></svg><span>Publish Center</span></button>
+        <button class="nav-item" type="button" data-view="audit"><svg><use href="#icon-history"></use></svg><span>Audit Log</span></button>
+        <button class="nav-item" type="button" data-view="settings"><svg><use href="#icon-settings"></use></svg><span>Settings</span></button>
+      </nav>
+
+      <div class="sidebar-status">
+        <span>环境</span>
+        <strong>Local Draft</strong>
+        <small id="sidebarVersion">icon-map-1.7-template-shadow-fr24yellow</small>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">CONFIG CONTROL</p>
+          <h1 id="pageTitle">Dashboard</h1>
+        </div>
+        <div class="topbar-actions">
+          <a class="button button--ghost" href="index.html">地图页</a>
+          <button class="button button--ghost" type="button" data-action="export-json"><svg><use href="#icon-download"></use></svg><span>导出 JSON</span></button>
+          <button class="button button--primary" type="button" data-action="publish-shortcut"><svg><use href="#icon-publish"></use></svg><span>发布草稿</span></button>
+        </div>
+      </header>
+
+      <section class="view is-active" id="dashboardView" data-view-panel="dashboard"></section>
+      <section class="view" id="iconsView" data-view-panel="icons"></section>
+      <section class="view" id="mappingsView" data-view-panel="mappings"></section>
+      <section class="view" id="previewView" data-view-panel="preview"></section>
+      <section class="view" id="publishView" data-view-panel="publish"></section>
+      <section class="view" id="auditView" data-view-panel="audit"></section>
+      <section class="view" id="settingsView" data-view-panel="settings"></section>
+    </main>
+
+    <aside class="editor-panel" id="editorPanel" aria-label="机型映射编辑"></aside>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="aircraft-icon-config.js?v=1.7-template-shadow-fr24yellow"></script>
+  <script src="admin.js?v=1.7-template-shadow-fr24yellow"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="4096" viewBox="0 0 64 64" fill="none" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
+  <title>MD11</title>
+  <path d="M32 3.7c3.3 0 5.3 14.4 6.1 20.5l20 8.3c1.1.5 1.8 1.6 1.8 2.8v3.6l-21.3-4.9-1.1 10.5 8.5 5.3v3.7L34.6 51 32 59.8 29.4 51 18 53.5v-3.7l8.5-5.3-1.1-10.5-21.3 4.9v-3.6c0-1.2.7-2.3 1.8-2.8l20-8.3c.8-6.1 2.8-20.5 6.1-20.5Zm-2.3 20.2h4.6v6h-4.6Zm-11.2 11.6h5v3.4h-5Zm22 0h5v3.4h-5Z" fill="#f8c400" stroke="#131920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+  <path d="M32 3.7c3.3 0 5.3 14.4 6.1 20.5l20 8.3c1.1.5 1.8 1.6 1.8 2.8v3.6l-21.3-4.9-1.1 10.5 8.5 5.3v3.7L34.6 51 32 59.8 29.4 51 18 53.5v-3.7l8.5-5.3-1.1-10.5-21.3 4.9v-3.6c0-1.2.7-2.3 1.8-2.8l20-8.3c.8-6.1 2.8-20.5 6.1-20.5Zm-2.3 20.2h4.6v6h-4.6Zm-11.2 11.6h5v3.4h-5Zm22 0h5v3.4h-5Z" fill="none" stroke="#ffe16a" stroke-opacity="0.22" stroke-width="0.32" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

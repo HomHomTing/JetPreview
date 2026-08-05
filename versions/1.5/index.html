@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Business jet map interface prototype.">
+    <title>Business Jet Radar 1.5</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%23ffd21c' stroke='%23161616' stroke-width='1.5' d='M16 2c1.7 0 2.8 7.7 3.2 10.6l10 4.2c.6.2.9.8.9 1.4v1.9l-10.7-2.4-.6 5.1 4.2 2.6v2l-5.8-1.3L16 31l-1.3-4.9-5.8 1.3v-2l4.2-2.6-.6-5.1-10.7 2.4v-1.9c0-.6.3-1.2.9-1.4l10-4.2C13.2 9.7 14.3 2 16 2Z'/%3E%3C/svg%3E">
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    >
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <svg aria-hidden="true" class="icon-sprite">
+      <symbol id="icon-search" viewBox="0 0 24 24">
+        <path d="m21 21-4.25-4.25M10.8 18.2a7.4 7.4 0 1 1 0-14.8 7.4 7.4 0 0 1 0 14.8Z" />
+      </symbol>
+      <symbol id="icon-menu" viewBox="0 0 24 24">
+        <path d="M4 7h16M4 12h16M4 17h16" />
+      </symbol>
+      <symbol id="icon-user" viewBox="0 0 24 24">
+        <path d="M20 21a8 8 0 0 0-16 0" />
+        <path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Z" />
+      </symbol>
+      <symbol id="icon-crosshair" viewBox="0 0 24 24">
+        <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+        <path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />
+      </symbol>
+      <symbol id="icon-cog" viewBox="0 0 24 24">
+        <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z" />
+        <path d="M19.4 15a1.8 1.8 0 0 0 .36 2l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.8 1.8 0 0 0-2-.36 1.8 1.8 0 0 0-1.08 1.65V21a2 2 0 1 1-4 0v-.08a1.8 1.8 0 0 0-1.08-1.65 1.8 1.8 0 0 0-2 .36l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.8 1.8 0 0 0 .36-2 1.8 1.8 0 0 0-1.65-1.08H3a2 2 0 1 1 0-4h.08a1.8 1.8 0 0 0 1.65-1.08 1.8 1.8 0 0 0-.36-2l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.8 1.8 0 0 0 2 .36h.01A1.8 1.8 0 0 0 10.28 3V3a2 2 0 1 1 4 0v.08a1.8 1.8 0 0 0 1.08 1.65 1.8 1.8 0 0 0 2-.36l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.8 1.8 0 0 0-.36 2v.01A1.8 1.8 0 0 0 21 10.28H21a2 2 0 1 1 0 4h-.08A1.8 1.8 0 0 0 19.4 15Z" />
+      </symbol>
+      <symbol id="icon-weather" viewBox="0 0 24 24">
+        <path d="M17.5 19H7a4 4 0 0 1-.5-8 5.7 5.7 0 0 1 10.85-1.65A4.9 4.9 0 0 1 17.5 19Z" />
+      </symbol>
+      <symbol id="icon-filter" viewBox="0 0 24 24">
+        <path d="M4 5h16l-6.2 7.1v5.4L10.2 19v-6.9L4 5Z" />
+      </symbol>
+      <symbol id="icon-close" viewBox="0 0 24 24">
+        <path d="M6 6l12 12M18 6 6 18" />
+      </symbol>
+      <symbol id="icon-badge" viewBox="0 0 24 24">
+        <path d="M12 3 4 6.8v5.8c0 4.4 3.2 7.7 8 8.4 4.8-.7 8-4 8-8.4V6.8L12 3Z" />
+        <path d="m9 12 2 2 4-5" />
+      </symbol>
+      <symbol id="icon-receiver" viewBox="0 0 24 24">
+        <path d="M4 14a8 8 0 0 1 16 0M8 14a4 4 0 0 1 8 0" />
+        <path d="M12 14v7M9 21h6" />
+      </symbol>
+      <symbol id="icon-mail" viewBox="0 0 24 24">
+        <path d="M4 6h16v12H4z" />
+        <path d="m4 7 8 6 8-6" />
+      </symbol>
+      <symbol id="icon-airport" viewBox="0 0 24 24">
+        <path d="M3 21h18" />
+        <path d="M7 17h10" />
+        <path d="M12 3 5 17h14L12 3Z" />
+      </symbol>
+      <symbol id="icon-chevron" viewBox="0 0 24 24">
+        <path d="m9 18 6-6-6-6" />
+      </symbol>
+    </svg>
+
+    <main class="fr-shell">
+      <div id="map" class="map"></div>
+      <div id="airportLayer" class="airport-layer" aria-label="Business aviation airports"></div>
+      <div id="aircraftLayer" class="aircraft-layer" aria-label="Business jet aircraft"></div>
+      <div class="radar-shadow" aria-hidden="true"></div>
+
+      <button class="login-chip" type="button" aria-label="Account">
+        <svg><use href="#icon-user"></use></svg>
+        <span>ACCOUNT</span>
+      </button>
+
+      <div class="search-card" role="search">
+        <svg><use href="#icon-search"></use></svg>
+        <input id="searchInput" type="search" placeholder="Search flight, airport, route" autocomplete="off" aria-label="Search business jet">
+        <div id="searchResults" class="search-results" hidden></div>
+      </div>
+
+      <button class="menu-button" type="button" aria-label="Open menu">
+        <svg><use href="#icon-menu"></use></svg>
+      </button>
+
+      <aside class="right-rail" aria-label="Operations panel" hidden>
+        <div class="rail-head">
+          <strong>Global BizJet Ops</strong>
+          <button type="button" class="rail-close" aria-label="Close panel">
+            <svg><use href="#icon-close"></use></svg>
+          </button>
+        </div>
+        <section class="rail-metrics" aria-label="Current map summary">
+          <div>
+            <strong id="railVisibleJets">0</strong>
+            <span>visible jets</span>
+          </div>
+          <div>
+            <strong id="railVisibleAirports">0</strong>
+            <span>airports</span>
+          </div>
+          <div>
+            <strong id="railAvgAltitude">0</strong>
+            <span>avg FL</span>
+          </div>
+        </section>
+        <section class="rail-list" aria-label="Active aircraft list">
+          <div class="rail-section-title">
+            <h2>Active aircraft</h2>
+            <span id="railAircraftSourceLabel">loading API</span>
+          </div>
+          <div id="railAircraftList"></div>
+        </section>
+        <section class="rail-list" aria-label="Airport operations list">
+          <div class="rail-section-title">
+            <h2>Airport operations</h2>
+            <span id="railAirportSourceLabel">loading airports</span>
+          </div>
+          <div id="railAirportList"></div>
+        </section>
+      </aside>
+
+      <button class="locate-button" id="locateButton" type="button" aria-label="Center map">
+        <svg><use href="#icon-crosshair"></use></svg>
+      </button>
+
+      <aside id="leftDetailPanel" class="left-detail-panel" aria-label="Selected operation detail" hidden>
+        <div class="detail-tabs">
+          <button type="button" class="detail-tab active" id="tabFlight">Flight</button>
+          <button type="button" class="detail-tab" id="tabAircraft">Aircraft</button>
+          <button type="button" class="detail-close" id="closeDetailPanel" aria-label="Close detail panel">
+            <svg><use href="#icon-close"></use></svg>
+          </button>
+        </div>
+        <section id="aircraftDetailView" class="detail-view">
+          <header class="flight-hero">
+            <div>
+              <p id="aircraftStatus">Live</p>
+              <h1 id="aircraftCallsign">-</h1>
+              <span id="aircraftSubhead">-</span>
+            </div>
+            <div id="aircraftTypeBadge" class="aircraft-type-badge">BJ</div>
+          </header>
+          <div class="route-card">
+            <div>
+              <strong id="routeFrom">-</strong>
+              <span id="routeFromName">-</span>
+            </div>
+            <i aria-hidden="true"></i>
+            <div>
+              <strong id="routeTo">-</strong>
+              <span id="routeToName">-</span>
+            </div>
+          </div>
+          <div class="progress-card">
+            <div class="progress-row">
+              <span id="departedTime">-</span>
+              <span id="arrivalTime">-</span>
+            </div>
+            <div class="progress-track"><span id="flightProgress"></span></div>
+            <div class="progress-row muted">
+              <span>Departed</span>
+              <span>Estimated arrival</span>
+            </div>
+          </div>
+          <section class="detail-section">
+            <h2>Flight details</h2>
+            <dl class="detail-grid">
+              <div><dt>Altitude</dt><dd id="flightAltitude">-</dd></div>
+              <div><dt>Ground speed</dt><dd id="flightSpeed">-</dd></div>
+              <div><dt>Vertical speed</dt><dd id="flightVerticalSpeed">-</dd></div>
+              <div><dt>Heading</dt><dd id="flightHeading">-</dd></div>
+              <div><dt>Coordinates</dt><dd id="flightCoordinates">-</dd></div>
+              <div><dt>Squawk</dt><dd id="flightSquawk">-</dd></div>
+            </dl>
+          </section>
+          <section class="detail-section">
+            <h2>Aircraft</h2>
+            <dl class="detail-list">
+              <div><dt>Model</dt><dd id="aircraftModel">-</dd></div>
+              <div><dt>Registration</dt><dd id="aircraftRegistration">-</dd></div>
+              <div><dt>Operator</dt><dd id="aircraftOperator">-</dd></div>
+              <div><dt>Data source</dt><dd id="aircraftSource">API pending</dd></div>
+            </dl>
+          </section>
+        </section>
+
+        <section id="airportDetailView" class="detail-view" hidden>
+          <header class="airport-hero">
+            <div>
+              <p>Airport</p>
+              <h1 id="airportCode">-</h1>
+              <span id="airportName">-</span>
+            </div>
+            <svg><use href="#icon-airport"></use></svg>
+          </header>
+          <section class="detail-section">
+            <h2>Airport information</h2>
+            <dl class="detail-grid">
+              <div><dt>City</dt><dd id="airportCity">-</dd></div>
+              <div><dt>Country</dt><dd id="airportCountry">-</dd></div>
+              <div><dt>Coordinates</dt><dd id="airportCoordinates">-</dd></div>
+              <div><dt>Elevation</dt><dd id="airportElevation">-</dd></div>
+              <div><dt>Weather</dt><dd id="airportWeather">-</dd></div>
+              <div><dt>Delay</dt><dd id="airportDelay">-</dd></div>
+            </dl>
+          </section>
+          <section class="detail-section">
+            <h2>Airport traffic</h2>
+            <dl class="detail-grid">
+              <div><dt>Departures</dt><dd id="airportDepartures">-</dd></div>
+              <div><dt>Arrivals</dt><dd id="airportArrivals">-</dd></div>
+              <div><dt>Ground aircraft</dt><dd id="airportGround">-</dd></div>
+              <div><dt>Runways</dt><dd id="airportRunways">-</dd></div>
+            </dl>
+          </section>
+          <section class="detail-section">
+            <h2>Related aircraft</h2>
+            <div id="airportRelatedFlights" class="related-list"></div>
+          </section>
+        </section>
+      </aside>
+
+      <section class="bottom-toolbar" aria-label="Map tools">
+        <button type="button" class="tool-button" id="settingsButton">
+          <svg><use href="#icon-cog"></use></svg>
+          <span>Settings</span>
+        </button>
+        <button type="button" class="tool-button" id="weatherButton">
+          <svg><use href="#icon-weather"></use></svg>
+          <span>Weather</span>
+        </button>
+        <button type="button" class="tool-button active" id="filtersButton">
+          <svg><use href="#icon-filter"></use></svg>
+          <span>Filters</span>
+        </button>
+      </section>
+
+      <section class="route-legend" id="routeLegend" aria-label="Route color legend">
+        <div class="route-legend-head">
+          <span id="routeLegendTitle">Altitude trail</span>
+          <div class="route-mode-toggle" role="group" aria-label="Route color mode">
+            <button type="button" class="active" data-route-mode="altitude">ALT</button>
+            <button type="button" data-route-mode="speed">SPD</button>
+          </div>
+        </div>
+        <div class="route-gradient route-gradient-altitude" id="routeGradient" aria-hidden="true"></div>
+        <div class="route-legend-scale" id="routeLegendScale">
+          <span>300ft</span>
+          <span>20k</span>
+          <span>43k+</span>
+        </div>
+      </section>
+
+      <section id="filterSheet" class="filter-sheet" aria-label="Filters" hidden>
+        <div class="sheet-head">
+          <div>
+            <p>Filters</p>
+            <h2>Aircraft type</h2>
+          </div>
+          <button type="button" class="sheet-close" id="closeFilters" aria-label="Close filters">
+            <svg><use href="#icon-close"></use></svg>
+          </button>
+        </div>
+        <label class="filter-row locked">
+          <input type="checkbox" checked disabled>
+          <span>
+            <strong>Business jets</strong>
+            <small>Private database aircraft only</small>
+          </span>
+        </label>
+        <label class="filter-row">
+          <input type="checkbox" id="labelToggle" checked>
+          <span>
+            <strong>Labels</strong>
+            <small>Callsign label beside aircraft</small>
+          </span>
+        </label>
+        <label class="filter-row">
+          <input type="checkbox" id="trailToggle" checked>
+          <span>
+            <strong>Flight tracks</strong>
+            <small>Recent path behind aircraft</small>
+          </span>
+        </label>
+        <div class="filter-row filter-row-select">
+          <span>
+            <strong>Airports</strong>
+            <small>Auto-loaded by map scale</small>
+          </span>
+          <select id="airportLayerMode" aria-label="Airport layer mode">
+            <option value="auto" selected>Auto</option>
+            <option value="on">On</option>
+            <option value="off">Off</option>
+          </select>
+        </div>
+      </section>
+
+    </main>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="./config.js"></script>
+    <script src="./aircraft-icon-config.js"></script>
+    <script src="./data-service.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

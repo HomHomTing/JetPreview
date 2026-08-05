@@ -1,0 +1,106 @@
+{
+  "sourceMode": "custom-equivalent-assets",
+  "license": "owned-custom",
+  "sourceVersion": "1.1.0",
+  "viewBox": "0 0 64 64",
+  "anchor": {
+    "x": 32,
+    "y": 32
+  },
+  "strokePolicy": "dark-stroke-default-white-stroke-selected",
+  "colorPolicy": {
+    "defaultFill": "#ffd21c",
+    "defaultStroke": "rgba(16, 16, 16, 0.86)",
+    "selectedFill": "#ff4b32",
+    "selectedStroke": "rgba(255, 255, 255, 0.94)"
+  },
+  "fr24IconKeys": [
+    {
+      "id": "lj45",
+      "file": "lj45.svg",
+      "description": "Business jet icon key used for current private jet samples.",
+      "mappedTypeCodes": ["GLF6", "GL7T", "FA8X", "C700", "GLF5", "GLEX", "E550", "PC24", "CL35", "FA7X", "GA5C"]
+    },
+    {
+      "id": "a388",
+      "file": "a388.svg",
+      "description": "Very large four-engine widebody sample icon.",
+      "mappedTypeCodes": ["A388"]
+    },
+    {
+      "id": "b744",
+      "file": "b744.svg",
+      "description": "Four-engine widebody sample icon.",
+      "mappedTypeCodes": ["B744"]
+    },
+    {
+      "id": "b77w",
+      "file": "b77w.svg",
+      "description": "Large twin-engine widebody sample icon.",
+      "mappedTypeCodes": ["B77W"]
+    },
+    {
+      "id": "b738",
+      "file": "b738.svg",
+      "description": "Narrowbody jet sample icon.",
+      "mappedTypeCodes": ["B738"]
+    },
+    {
+      "id": "a320",
+      "file": "a320.svg",
+      "description": "Airbus narrowbody jet sample icon.",
+      "mappedTypeCodes": ["A20N", "A320"]
+    },
+    {
+      "id": "e190",
+      "file": "e190.svg",
+      "description": "Regional jet sample icon.",
+      "mappedTypeCodes": ["E190"]
+    },
+    {
+      "id": "at76",
+      "file": "at76.svg",
+      "description": "Twin turboprop sample icon.",
+      "mappedTypeCodes": ["AT76"]
+    },
+    {
+      "id": "c172",
+      "file": "c172.svg",
+      "description": "Light piston aircraft sample icon.",
+      "mappedTypeCodes": ["C172"]
+    },
+    {
+      "id": "h135",
+      "file": "h135.svg",
+      "description": "Helicopter sample icon.",
+      "mappedTypeCodes": ["H135"]
+    }
+  ],
+  "sizeClasses": [
+    {
+      "id": "light",
+      "file": "light.svg",
+      "description": "Short fuselage and narrow wings for light business jets."
+    },
+    {
+      "id": "midsize",
+      "file": "midsize.svg",
+      "description": "Medium fuselage and moderate swept wing for midsize business jets."
+    },
+    {
+      "id": "super-midsize",
+      "file": "super-midsize.svg",
+      "description": "Longer body and broader swept wing for super midsize business jets."
+    },
+    {
+      "id": "long-range",
+      "file": "long-range.svg",
+      "description": "Long fuselage and wide wing silhouette for long range business jets."
+    },
+    {
+      "id": "ultra-long",
+      "file": "ultra-long.svg",
+      "description": "Largest business jet silhouette with extended fuselage and wings."
+    }
+  ]
+}

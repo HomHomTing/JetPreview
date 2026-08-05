@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="4096" viewBox="0 0 64 64" fill="none" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
+  <title>GRND</title>
+  <path d="M25 10h14c1.4 0 2.5 1.1 2.5 2.5v39c0 1.4-1.1 2.5-2.5 2.5H25c-1.4 0-2.5-1.1-2.5-2.5v-39c0-1.4 1.1-2.5 2.5-2.5Zm2.5 4.8v8h9v-8h-9Zm-1 11.7v11h11v-11h-11Zm1 14.7v8h9v-8h-9Zm-8-18.7h3v7h-3v-7Zm0 12h3v7h-3v-7Zm22-12h3v7h-3v-7Zm0 12h3v7h-3v-7Z" fill="#f8c400" stroke="#131920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+  <path d="M25 10h14c1.4 0 2.5 1.1 2.5 2.5v39c0 1.4-1.1 2.5-2.5 2.5H25c-1.4 0-2.5-1.1-2.5-2.5v-39c0-1.4 1.1-2.5 2.5-2.5Zm2.5 4.8v8h9v-8h-9Zm-1 11.7v11h11v-11h-11Zm1 14.7v8h9v-8h-9Zm-8-18.7h3v7h-3v-7Zm0 12h3v7h-3v-7Zm22-12h3v7h-3v-7Zm0 12h3v7h-3v-7Z" fill="none" stroke="#ffe16a" stroke-opacity="0.22" stroke-width="0.32" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

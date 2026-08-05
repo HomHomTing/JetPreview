@@ -1,0 +1,25 @@
+.DS_Store
+**/.DS_Store
+
+# Local runtime credentials. Copy config.example.js to config.js locally.
+config.js
+
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies and generated build outputs
+node_modules/
+public-preview/
+
+# Generated archives are kept locally; source folders remain versioned.
+*.zip
+
+# Logs and temporary files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.cache/
+tmp/

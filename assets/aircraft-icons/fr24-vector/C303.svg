@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="4096" viewBox="0 0 64 64" fill="none" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
+  <title>C303</title>
+  <path d="M32 8.8c1.9 0 3.3 9.7 4 15.2l17.2 4.8c1 .3 1.7 1.2 1.7 2.3v2.9L36.9 31.8l-.8 7.8 6 3.8v3l-8.3-1.8L32 53.8l-1.8-9.2-8.3 1.8v-3l6-3.8-.8-7.8L9.1 34v-2.9c0-1.1.7-2 1.7-2.3L28 24c.7-5.5 2.1-15.2 4-15.2Zm-12.8 18.6h4.2v6.4h-4.2Zm21.4 0h4.2v6.4h-4.2Z" fill="#f8c400" stroke="#131920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+  <path d="M32 8.8c1.9 0 3.3 9.7 4 15.2l17.2 4.8c1 .3 1.7 1.2 1.7 2.3v2.9L36.9 31.8l-.8 7.8 6 3.8v3l-8.3-1.8L32 53.8l-1.8-9.2-8.3 1.8v-3l6-3.8-.8-7.8L9.1 34v-2.9c0-1.1.7-2 1.7-2.3L28 24c.7-5.5 2.1-15.2 4-15.2Zm-12.8 18.6h4.2v6.4h-4.2Zm21.4 0h4.2v6.4h-4.2Z" fill="none" stroke="#ffe16a" stroke-opacity="0.22" stroke-width="0.32" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,422 @@
+[
+  {
+    "iconKey": "LJ60",
+    "path": "assets/aircraft-icons/fr24-transparent/LJ60.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 19070,
+    "solidPixels": 15759,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "C206",
+    "path": "assets/aircraft-icons/fr24-transparent/C206.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 22069,
+    "solidPixels": 17393,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "C303",
+    "path": "assets/aircraft-icons/fr24-transparent/C303.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 24257,
+    "solidPixels": 18769,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "Q300",
+    "path": "assets/aircraft-icons/fr24-transparent/Q300.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 23429,
+    "solidPixels": 17663,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "ASW20",
+    "path": "assets/aircraft-icons/fr24-transparent/ASW20.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 7516,
+    "solidPixels": 4473,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "A320",
+    "path": "assets/aircraft-icons/fr24-transparent/A320.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 22279,
+    "solidPixels": 16713,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "B738",
+    "path": "assets/aircraft-icons/fr24-transparent/B738.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 23941,
+    "solidPixels": 18570,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "B736",
+    "path": "assets/aircraft-icons/fr24-transparent/B736.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 22845,
+    "solidPixels": 17715,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "B757",
+    "path": "assets/aircraft-icons/fr24-transparent/B757.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 17706,
+    "solidPixels": 12992,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "FOKKER100",
+    "path": "assets/aircraft-icons/fr24-transparent/FOKKER100.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 20529,
+    "solidPixels": 15413,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "RJ85",
+    "path": "assets/aircraft-icons/fr24-transparent/RJ85.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 24820,
+    "solidPixels": 18819,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "B767",
+    "path": "assets/aircraft-icons/fr24-transparent/B767.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 22156,
+    "solidPixels": 16143,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "A330",
+    "path": "assets/aircraft-icons/fr24-transparent/A330.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 22156,
+    "solidPixels": 16143,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "B777",
+    "path": "assets/aircraft-icons/fr24-transparent/B777.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 25728,
+    "solidPixels": 19865,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "MD11",
+    "path": "assets/aircraft-icons/fr24-transparent/MD11.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 23374,
+    "solidPixels": 17883,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "A343",
+    "path": "assets/aircraft-icons/fr24-transparent/A343.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 22743,
+    "solidPixels": 16691,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "A346",
+    "path": "assets/aircraft-icons/fr24-transparent/A346.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 22743,
+    "solidPixels": 16691,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "B747",
+    "path": "assets/aircraft-icons/fr24-transparent/B747.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 25381,
+    "solidPixels": 19543,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "A380",
+    "path": "assets/aircraft-icons/fr24-transparent/A380.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 29245,
+    "solidPixels": 22575,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "A225",
+    "path": "assets/aircraft-icons/fr24-transparent/A225.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 28653,
+    "solidPixels": 22230,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "A3ST",
+    "path": "assets/aircraft-icons/fr24-transparent/A3ST.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 27643,
+    "solidPixels": 22015,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "EC",
+    "path": "assets/aircraft-icons/fr24-transparent/EC.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 9684,
+    "solidPixels": 6857,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "BALL",
+    "path": "assets/aircraft-icons/fr24-transparent/BALL.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 52437,
+    "solidPixels": 48518,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "DRON",
+    "path": "assets/aircraft-icons/fr24-transparent/DRON.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 35699,
+    "solidPixels": 22321,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "FGTR",
+    "path": "assets/aircraft-icons/fr24-transparent/FGTR.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 28228,
+    "solidPixels": 24004,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "GRND",
+    "path": "assets/aircraft-icons/fr24-transparent/GRND.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 40122,
+    "solidPixels": 36574,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "SI2",
+    "path": "assets/aircraft-icons/fr24-transparent/SI2.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 11912,
+    "solidPixels": 8049,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "CONC",
+    "path": "assets/aircraft-icons/fr24-transparent/CONC.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 18339,
+    "solidPixels": 14801,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "SAT",
+    "path": "assets/aircraft-icons/fr24-transparent/SAT.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 12702,
+    "solidPixels": 9453,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "iconKey": "ISS",
+    "path": "assets/aircraft-icons/fr24-transparent/ISS.png",
+    "width": 512,
+    "height": 512,
+    "nonTransparentPixels": 46607,
+    "solidPixels": 31443,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  }
+]

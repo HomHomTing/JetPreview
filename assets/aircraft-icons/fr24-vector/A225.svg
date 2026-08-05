@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="4096" viewBox="0 0 64 64" fill="none" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
+  <title>A225</title>
+  <path d="M32 2.2c4.1 0 6.3 16.8 7.3 23.3l22.8 8.8c1.3.5 2.1 1.7 2.1 3.1v4.1l-24.2-5.4-1.5 11.5 10 6.2v4.1l-13.1-2.9L32 62.5 28.6 55l-13.1 2.9v-4.1l10-6.2L24 36.1-.2 41.5v-4.1c0-1.4.8-2.6 2.1-3.1l22.8-8.8c1-6.5 3.2-23.3 7.3-23.3ZM8.4 35.9h3.8v2.9H8.4Zm7.3.4h3.8v2.9h-3.8Zm7.3.4h3.8v2.9H23Zm14.2 0H41v2.9h-3.8Zm7.3-.4h3.8v2.9h-3.8Zm7.3-.4h3.8v2.9h-3.8Z" fill="#f8c400" stroke="#131920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+  <path d="M32 2.2c4.1 0 6.3 16.8 7.3 23.3l22.8 8.8c1.3.5 2.1 1.7 2.1 3.1v4.1l-24.2-5.4-1.5 11.5 10 6.2v4.1l-13.1-2.9L32 62.5 28.6 55l-13.1 2.9v-4.1l10-6.2L24 36.1-.2 41.5v-4.1c0-1.4.8-2.6 2.1-3.1l22.8-8.8c1-6.5 3.2-23.3 7.3-23.3ZM8.4 35.9h3.8v2.9H8.4Zm7.3.4h3.8v2.9h-3.8Zm7.3.4h3.8v2.9H23Zm14.2 0H41v2.9h-3.8Zm7.3-.4h3.8v2.9h-3.8Zm7.3-.4h3.8v2.9h-3.8Z" fill="none" stroke="#ffe16a" stroke-opacity="0.22" stroke-width="0.32" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

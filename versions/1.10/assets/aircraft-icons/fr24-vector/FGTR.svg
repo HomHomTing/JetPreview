@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="4096" viewBox="0 0 64 64" fill="none" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
+  <title>FGTR</title>
+  <path d="M32 4c2.6 0 4.2 13.7 4.8 20.2l20.5 10.2v3.4L37.5 34l-2.4 10 8.4 7.2v3.4L33.7 51 32 60l-1.7-9-9.8 3.6v-3.4l8.4-7.2-2.4-10L6.7 37.8v-3.4l20.5-10.2C27.8 17.7 29.4 4 32 4Z" fill="#f8c400" stroke="#131920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+  <path d="M32 4c2.6 0 4.2 13.7 4.8 20.2l20.5 10.2v3.4L37.5 34l-2.4 10 8.4 7.2v3.4L33.7 51 32 60l-1.7-9-9.8 3.6v-3.4l8.4-7.2-2.4-10L6.7 37.8v-3.4l20.5-10.2C27.8 17.7 29.4 4 32 4Z" fill="none" stroke="#ffe16a" stroke-opacity="0.22" stroke-width="0.32" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>
