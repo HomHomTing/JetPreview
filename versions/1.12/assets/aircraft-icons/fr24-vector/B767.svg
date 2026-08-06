@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="4096" viewBox="0 0 64 64" fill="none" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
+  <title>B767</title>
+  <path d="M32 4.5c3.1 0 5.1 14.4 6 20.5l19.2 8.1c1.1.5 1.8 1.6 1.8 2.8v3.5l-20.5-4.8-1.2 10.2 8.2 5.2v3.6l-10.9-2.4L32 59.7l-2.6-8.5-10.9 2.4V50l8.2-5.2-1.2-10.2L5 39.4v-3.5c0-1.2.7-2.3 1.8-2.8L26 25c.9-6.1 2.9-20.5 6-20.5ZM19 35.8h5.1v3.5H19Zm20.9 0H45v3.5h-5.1Z" fill="#f8c400" stroke="#131920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+  <path d="M32 4.5c3.1 0 5.1 14.4 6 20.5l19.2 8.1c1.1.5 1.8 1.6 1.8 2.8v3.5l-20.5-4.8-1.2 10.2 8.2 5.2v3.6l-10.9-2.4L32 59.7l-2.6-8.5-10.9 2.4V50l8.2-5.2-1.2-10.2L5 39.4v-3.5c0-1.2.7-2.3 1.8-2.8L26 25c.9-6.1 2.9-20.5 6-20.5ZM19 35.8h5.1v3.5H19Zm20.9 0H45v3.5h-5.1Z" fill="none" stroke="#ffe16a" stroke-opacity="0.22" stroke-width="0.32" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

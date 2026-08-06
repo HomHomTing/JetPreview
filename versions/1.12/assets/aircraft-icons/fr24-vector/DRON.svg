@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="4096" viewBox="0 0 64 64" fill="none" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
+  <title>DRON</title>
+  <path d="M30 29h4v6h-4v-6Zm-15-14a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm34 0a5 5 0 1 1 0 10 5 5 0 0 1 0-10ZM15 39a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm34 0a5 5 0 1 1 0 10 5 5 0 0 1 0-10ZM20 22l10 7-2.2 3.2-10-7L20 22Zm24 0 2.2 3.2-10 7L34 29l10-7ZM17.8 38.8l10-7L30 35l-10 7-2.2-3.2Zm28.4 0L44 42l-10-7 2.2-3.2 10 7Z" fill="#f8c400" stroke="#131920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+  <path d="M30 29h4v6h-4v-6Zm-15-14a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm34 0a5 5 0 1 1 0 10 5 5 0 0 1 0-10ZM15 39a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm34 0a5 5 0 1 1 0 10 5 5 0 0 1 0-10ZM20 22l10 7-2.2 3.2-10-7L20 22Zm24 0 2.2 3.2-10 7L34 29l10-7ZM17.8 38.8l10-7L30 35l-10 7-2.2-3.2Zm28.4 0L44 42l-10-7 2.2-3.2 10 7Z" fill="none" stroke="#ffe16a" stroke-opacity="0.22" stroke-width="0.32" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

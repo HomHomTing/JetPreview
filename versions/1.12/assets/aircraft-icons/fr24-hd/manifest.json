@@ -1,0 +1,512 @@
+[
+  {
+    "iconKey": "A225",
+    "path": "assets/aircraft-icons/fr24-hd/A225.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 448321,
+    "bodyPixels": 267091,
+    "edgePixels": 55212,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "A320",
+    "path": "assets/aircraft-icons/fr24-hd/A320.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 355805,
+    "bodyPixels": 206510,
+    "edgePixels": 47609,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "A330",
+    "path": "assets/aircraft-icons/fr24-hd/A330.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 334894,
+    "bodyPixels": 192248,
+    "edgePixels": 48764,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "A343",
+    "path": "assets/aircraft-icons/fr24-hd/A343.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 350852,
+    "bodyPixels": 193883,
+    "edgePixels": 50049,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "A346",
+    "path": "assets/aircraft-icons/fr24-hd/A346.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 350693,
+    "bodyPixels": 193787,
+    "edgePixels": 50212,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "A380",
+    "path": "assets/aircraft-icons/fr24-hd/A380.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 448058,
+    "bodyPixels": 271815,
+    "edgePixels": 55558,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "A3ST",
+    "path": "assets/aircraft-icons/fr24-hd/A3ST.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 434207,
+    "bodyPixels": 279831,
+    "edgePixels": 50060,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "ASW20",
+    "path": "assets/aircraft-icons/fr24-hd/ASW20.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 122566,
+    "bodyPixels": 31153,
+    "edgePixels": 22056,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "B736",
+    "path": "assets/aircraft-icons/fr24-hd/B736.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 369878,
+    "bodyPixels": 227135,
+    "edgePixels": 43237,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "B738",
+    "path": "assets/aircraft-icons/fr24-hd/B738.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 393756,
+    "bodyPixels": 226667,
+    "edgePixels": 51270,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "B747",
+    "path": "assets/aircraft-icons/fr24-hd/B747.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 387024,
+    "bodyPixels": 236804,
+    "edgePixels": 47593,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "B757",
+    "path": "assets/aircraft-icons/fr24-hd/B757.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 272611,
+    "bodyPixels": 145825,
+    "edgePixels": 40550,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "B767",
+    "path": "assets/aircraft-icons/fr24-hd/B767.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 334461,
+    "bodyPixels": 192033,
+    "edgePixels": 48789,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "B777",
+    "path": "assets/aircraft-icons/fr24-hd/B777.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 397774,
+    "bodyPixels": 236333,
+    "edgePixels": 49492,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "BALL",
+    "path": "assets/aircraft-icons/fr24-hd/BALL.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 804340,
+    "bodyPixels": 698958,
+    "edgePixels": 32300,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "C206",
+    "path": "assets/aircraft-icons/fr24-hd/C206.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 356274,
+    "bodyPixels": 214122,
+    "edgePixels": 42735,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "C303",
+    "path": "assets/aircraft-icons/fr24-hd/C303.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 381523,
+    "bodyPixels": 231523,
+    "edgePixels": 44699,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "CONC",
+    "path": "assets/aircraft-icons/fr24-hd/CONC.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 266941,
+    "bodyPixels": 180568,
+    "edgePixels": 30865,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "DRON",
+    "path": "assets/aircraft-icons/fr24-hd/DRON.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 595886,
+    "bodyPixels": 199258,
+    "edgePixels": 123573,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "EC",
+    "path": "assets/aircraft-icons/fr24-hd/EC.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 208502,
+    "bodyPixels": 64517,
+    "edgePixels": 38819,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "FGTR",
+    "path": "assets/aircraft-icons/fr24-hd/FGTR.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 446675,
+    "bodyPixels": 328016,
+    "edgePixels": 38137,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "FOKKER100",
+    "path": "assets/aircraft-icons/fr24-hd/FOKKER100.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 320344,
+    "bodyPixels": 183435,
+    "edgePixels": 40786,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "GRND",
+    "path": "assets/aircraft-icons/fr24-hd/GRND.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 620650,
+    "bodyPixels": 509778,
+    "edgePixels": 22969,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "ISS",
+    "path": "assets/aircraft-icons/fr24-hd/ISS.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 696505,
+    "bodyPixels": 329814,
+    "edgePixels": 107557,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "LJ60",
+    "path": "assets/aircraft-icons/fr24-hd/LJ60.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 335580,
+    "bodyPixels": 202043,
+    "edgePixels": 44165,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "MD11",
+    "path": "assets/aircraft-icons/fr24-hd/MD11.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 366153,
+    "bodyPixels": 217022,
+    "edgePixels": 46134,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "Q300",
+    "path": "assets/aircraft-icons/fr24-hd/Q300.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 361693,
+    "bodyPixels": 198924,
+    "edgePixels": 46999,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "RJ85",
+    "path": "assets/aircraft-icons/fr24-hd/RJ85.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 386834,
+    "bodyPixels": 228204,
+    "edgePixels": 51175,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "SAT",
+    "path": "assets/aircraft-icons/fr24-hd/SAT.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 203811,
+    "bodyPixels": 119749,
+    "edgePixels": 28348,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  },
+  {
+    "iconKey": "SI2",
+    "path": "assets/aircraft-icons/fr24-hd/SI2.png",
+    "width": 2048,
+    "height": 2048,
+    "nonTransparentPixels": 185320,
+    "bodyPixels": 86097,
+    "edgePixels": 34905,
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "fillColor": "#f8c400",
+    "edgeColor": "#121920"
+  }
+]
