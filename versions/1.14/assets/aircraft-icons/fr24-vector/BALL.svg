@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="4096" viewBox="0 0 64 64" fill="none" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
+  <title>BALL</title>
+  <path d="M32 6c8.2 0 14.6 6.7 14.6 15.4 0 8.5-5.2 17.1-12.2 20.9l2.4 5.7h4.6v4H22.6v-4h4.6l2.4-5.7c-7-3.8-12.2-12.4-12.2-20.9C17.4 12.7 23.8 6 32 6Zm-8 15.2c0 6.2 3.2 12.9 8 16.4 4.8-3.5 8-10.2 8-16.4C40 15.4 36.5 11 32 11s-8 4.4-8 10.2Z" fill="#f8c400" stroke="#131920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+  <path d="M32 6c8.2 0 14.6 6.7 14.6 15.4 0 8.5-5.2 17.1-12.2 20.9l2.4 5.7h4.6v4H22.6v-4h4.6l2.4-5.7c-7-3.8-12.2-12.4-12.2-20.9C17.4 12.7 23.8 6 32 6Zm-8 15.2c0 6.2 3.2 12.9 8 16.4 4.8-3.5 8-10.2 8-16.4C40 15.4 36.5 11 32 11s-8 4.4-8 10.2Z" fill="none" stroke="#ffe16a" stroke-opacity="0.22" stroke-width="0.32" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

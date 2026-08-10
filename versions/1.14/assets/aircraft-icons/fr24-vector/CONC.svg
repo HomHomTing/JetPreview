@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="4096" viewBox="0 0 64 64" fill="none" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
+  <title>CONC</title>
+  <path d="M32 3c2.4 0 4.3 15.5 5 22.2l23.5 13.5v4L37.4 35l-2.1 10.5 10.4 6.8v3.8L33.8 53 32 61l-1.8-8-11.9 3.1v-3.8l10.4-6.8L26.6 35 3.5 42.7v-4L27 25.2C27.7 18.5 29.6 3 32 3Z" fill="#f8c400" stroke="#131920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+  <path d="M32 3c2.4 0 4.3 15.5 5 22.2l23.5 13.5v4L37.4 35l-2.1 10.5 10.4 6.8v3.8L33.8 53 32 61l-1.8-8-11.9 3.1v-3.8l10.4-6.8L26.6 35 3.5 42.7v-4L27 25.2C27.7 18.5 29.6 3 32 3Z" fill="none" stroke="#ffe16a" stroke-opacity="0.22" stroke-width="0.32" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

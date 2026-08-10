@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="4096" viewBox="0 0 64 64" fill="none" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
+  <title>ISS</title>
+  <path d="M28 24h8v16h-8V24Zm-24 2h18v4H4v-4Zm38 0h18v4H42v-4ZM4 34h18v4H4v-4Zm38 0h18v4H42v-4ZM25 17h14v4H25v-4Zm0 24h14v4H25v-4Zm-7-5h8v4h-8v-4Zm20 0h8v4h-8v-4Zm-20-12h8v4h-8v-4Zm20 0h8v4h-8v-4Z" fill="#f8c400" stroke="#131920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+  <path d="M28 24h8v16h-8V24Zm-24 2h18v4H4v-4Zm38 0h18v4H42v-4ZM4 34h18v4H4v-4Zm38 0h18v4H42v-4ZM25 17h14v4H25v-4Zm0 24h14v4H25v-4Zm-7-5h8v4h-8v-4Zm20 0h8v4h-8v-4Zm-20-12h8v4h-8v-4Zm20 0h8v4h-8v-4Z" fill="none" stroke="#ffe16a" stroke-opacity="0.22" stroke-width="0.32" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>
