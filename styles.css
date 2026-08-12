@@ -1243,7 +1243,7 @@ button {
 }
 
 .speed-altitude-chart {
-  min-height: 196px;
+  min-height: 214px;
   border-radius: 6px;
   background: #101820;
 }
@@ -1290,6 +1290,20 @@ button {
   text-anchor: end;
 }
 
+.chart-axis-mid {
+  text-anchor: middle;
+}
+
+.chart-axis-local {
+  fill: rgba(255, 255, 255, 0.82);
+}
+
+.chart-axis-utc {
+  fill: rgba(255, 255, 255, 0.46);
+  font-size: 8.5px;
+  font-weight: 600;
+}
+
 .legend-alt {
   fill: #ffd21c;
 }
@@ -1300,7 +1314,7 @@ button {
 
 .chart-empty {
   display: grid;
-  min-height: 196px;
+  min-height: 214px;
   place-items: center;
   color: #bfc7ce;
   font-size: 13px;
@@ -1309,6 +1323,47 @@ button {
 
 .chart-readouts {
   padding: 0 14px 12px;
+}
+
+.chart-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 10px;
+}
+
+.chart-section-head h2 {
+  margin: 0;
+}
+
+.chart-unit-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+  min-width: 132px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.chart-unit-toggle button {
+  height: 24px;
+  border: 0;
+  color: #b8c0c7;
+  background: transparent;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.chart-unit-toggle button + button {
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.chart-unit-toggle button.active {
+  color: #111;
+  background: var(--yellow);
 }
 
 .detail-action-bar {
@@ -2026,6 +2081,14 @@ button {
   justify-content: flex-end;
 }
 
+.selected-panel-v114 .route-airport-link:last-child .route-code-row em {
+  order: 1;
+}
+
+.selected-panel-v114 .route-airport-link:last-child .route-code-row strong {
+  order: 2;
+}
+
 .selected-panel-v114 .route-code-row em {
   display: inline-flex;
   align-items: center;
@@ -2204,6 +2267,31 @@ button {
 
 .selected-panel-v114 .journey-distance-metric div[hidden] {
   display: none;
+}
+
+.selected-panel-v114 .journey-distance-metric .journey-timezone-diff {
+  border-color: rgba(61, 224, 192, 0.13);
+  background: rgba(61, 224, 192, 0.055);
+}
+
+.selected-panel-v114 .journey-distance-metric .journey-timezone-diff dt::before {
+  content: "UTC";
+  display: inline-flex;
+  align-items: center;
+  min-height: 16px;
+  margin-right: 7px;
+  padding: 1px 5px;
+  border: 1px solid rgba(61, 224, 192, 0.2);
+  border-radius: 4px;
+  color: var(--graphite-mint);
+  font-family: "SFMono-Regular", "Roboto Mono", Consolas, monospace;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.selected-panel-v114 .journey-distance-metric .journey-timezone-diff dd {
+  color: var(--graphite-mint);
+  font-size: 14px;
 }
 
 .selected-panel-v114 .journey-distance-metric dd {
@@ -2440,6 +2528,7 @@ button {
 }
 
 .selected-panel-v114 .speed-altitude-chart {
+  position: relative;
   min-height: 196px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.04);
@@ -2465,6 +2554,58 @@ button {
 
 .selected-panel-v114 .legend-speed {
   fill: #87a2ff;
+}
+
+.selected-panel-v114 .chart-hit-zone {
+  fill: transparent;
+  pointer-events: all;
+  cursor: crosshair;
+}
+
+.selected-panel-v114 .chart-hover-layer {
+  pointer-events: none;
+}
+
+.selected-panel-v114 .chart-hover-layer line {
+  stroke: rgba(255, 255, 255, 0.52);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+
+.selected-panel-v114 .chart-hover-point {
+  stroke: #101216;
+  stroke-width: 1.4;
+}
+
+.selected-panel-v114 .chart-hover-altitude-point {
+  fill: var(--graphite-mint);
+}
+
+.selected-panel-v114 .chart-hover-speed-point {
+  fill: #87a2ff;
+}
+
+.selected-panel-v114 .chart-hover-card rect {
+  fill: rgba(13, 16, 21, 0.94);
+  stroke: rgba(255, 255, 255, 0.16);
+}
+
+.selected-panel-v114 .chart-hover-card text {
+  fill: var(--graphite-text);
+  font-family: "SFMono-Regular", "Roboto Mono", Consolas, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.selected-panel-v114 .chart-hover-card text:first-of-type {
+  fill: var(--graphite-text);
+  font-weight: 700;
+}
+
+.selected-panel-v114 .chart-hover-card text:nth-of-type(2) {
+  fill: var(--graphite-muted);
+  font-weight: 600;
 }
 
 .selected-panel-v114 .related-flight {
@@ -2890,7 +3031,9 @@ button {
 }
 
 .aircraft-marker-shell {
-  position: relative;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   display: grid;
   place-items: center;
   width: var(--aircraft-hit-size, 36px);
@@ -2915,6 +3058,7 @@ button {
 
 .aircraft-marker {
   position: absolute;
+  z-index: 1000;
   width: var(--aircraft-hit-size, 36px);
   height: var(--aircraft-hit-size, 36px);
   border: 0;
@@ -2926,6 +3070,7 @@ button {
   transform: translate(calc(var(--aircraft-hit-size, 36px) / -2), calc(var(--aircraft-hit-size, 36px) / -2));
   user-select: none;
   opacity: 1;
+  isolation: isolate;
   transition: opacity 130ms ease, filter 130ms ease;
 }
 
@@ -2999,20 +3144,25 @@ button {
 
 .aircraft-label {
   position: absolute;
-  top: 24px;
-  left: var(--aircraft-label-left, 39px);
-  max-width: 84px;
-  padding: 3px 6px;
+  z-index: 30;
+  bottom: var(--aircraft-label-bottom, 36px);
+  left: 50%;
+  max-width: 96px;
+  min-height: 18px;
+  padding: 3px 7px;
   overflow: hidden;
-  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 4px;
   color: #fff;
-  background: rgba(21, 21, 21, 0.88);
+  background: rgba(20, 22, 24, 0.9);
   font-size: 12px;
-  line-height: 1;
+  font-weight: 750;
+  line-height: 1.05;
   text-overflow: ellipsis;
   white-space: nowrap;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.38);
   pointer-events: none;
+  transform: translateX(-50%) translateZ(0);
 }
 
 .aircraft-marker.label-hidden .aircraft-label {
@@ -3049,6 +3199,10 @@ button {
 .aircraft-marker.is-selected.is-expired .aircraft-icon,
 .aircraft-marker.is-selected.is-expired .aircraft-label {
   opacity: 1;
+}
+
+.aircraft-marker.is-selected {
+  z-index: 1120;
 }
 
 .aircraft-marker.is-selected .aircraft-label {
@@ -3136,9 +3290,26 @@ button {
   transition: opacity 120ms ease, filter 120ms ease;
 }
 
+.airport-pin.is-hovered {
+  z-index: 350;
+}
+
+.airport-pin:hover:not(.is-selected),
+.airport-pin.is-current-hover {
+  z-index: 350;
+}
+
 .airport-pin.is-removing {
   opacity: 0;
   pointer-events: none;
+}
+
+.airport-pin.is-selected {
+  z-index: 340;
+}
+
+.airport-pin.is-selected.is-hovered {
+  z-index: 345;
 }
 
 .airport-marker-hit {
@@ -3235,27 +3406,60 @@ button {
 
 .airport-hover-label {
   position: absolute;
-  z-index: 4;
-  top: calc(var(--airport-hit-height, 40px) + 2px);
-  left: 50%;
-  display: block;
-  max-width: 210px;
-  min-height: 22px;
-  padding: 5px 8px 4px;
-  overflow: hidden;
+  z-index: 24;
+  top: var(--airport-popup-top, calc(var(--airport-hit-height, 40px) + 14px));
+  left: var(--airport-popup-left, 50%);
+  display: grid;
+  width: max-content;
+  min-width: 220px;
+  max-width: min(360px, calc(100vw - 32px));
+  min-height: 0;
+  gap: 6px;
+  padding: 8px 10px 9px;
+  overflow: visible;
   border-radius: 4px;
   color: #fff;
   background: rgba(22, 24, 26, 0.92);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.38);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.1;
-  text-overflow: ellipsis;
-  transform: translateX(-50%);
-  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: left;
+  transform: var(--airport-popup-transform, translateX(-50%));
+  white-space: normal;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
+  will-change: opacity, transform;
+}
+
+.airport-hover-name-cn,
+.airport-hover-name-en,
+.airport-hover-code-line {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.airport-hover-name-cn {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.airport-hover-name-en {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.airport-hover-code-line {
+  color: #fff;
+  font-family: "SFMono-Regular", "Roboto Mono", Consolas, monospace;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+  white-space: nowrap;
 }
 
 .airport-pin.label-none .airport-code-label {
@@ -3263,30 +3467,24 @@ button {
   visibility: hidden;
 }
 
-.airport-pin:hover .airport-code-label {
+.airport-pin.is-hovered .airport-code-label {
   opacity: 0;
   visibility: hidden;
 }
 
-.airport-pin:hover .airport-hover-label {
+.airport-pin.is-hovered.is-popup-ready .airport-hover-label {
   opacity: 1;
   visibility: visible;
 }
 
 .airport-pin.is-selected .airport-code-label {
-  color: #fff;
-  background: rgba(207, 49, 34, 0.95);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
-}
-
-.airport-pin.is-selected:hover .airport-code-label {
-  opacity: 1;
-  visibility: visible;
-}
-
-.airport-pin.is-selected:hover .airport-hover-label {
   opacity: 0;
   visibility: hidden;
+}
+
+.airport-pin.is-selected.is-hovered.is-popup-ready .airport-hover-label {
+  opacity: 1;
+  visibility: visible;
 }
 
 .native-map-marker.aircraft-marker,

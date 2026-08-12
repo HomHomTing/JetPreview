@@ -4,6 +4,7 @@ const timeUtils = window.BIZJET_TIME || {};
 const AIRCRAFT_ICON_RUNTIME_STORAGE_KEY = "aircraft-icon-runtime-config:v1.12";
 const AIRCRAFT_ICON_TYPE_CODE_CACHE_STORAGE_KEY = "aircraft-icon-type-code-cache:v1.12";
 const AIRCRAFT_ICON_TYPE_CODE_CACHE_MAX_ENTRIES = 1600;
+const SPEED_ALTITUDE_CHART_MAX_POINTS = 320;
 const aircraftIconRuntimeConfig = readAircraftIconRuntimeConfig();
 const aircraftIconTypeCodeCache = readAircraftIconTypeCodeCache();
 const groundProjectionCore = window.AIRCRAFT_GROUND_PROJECTION;
@@ -29,6 +30,14 @@ const missingValueTexts = new Set([
   "AIRPORT UNKNOWN",
   "TO BE CONFIRMED"
 ]);
+const AIRPORT_MARKER_BASE_Z_INDEX = 300;
+const AIRPORT_MARKER_SELECTED_Z_INDEX = 340;
+const AIRPORT_MARKER_SELECTED_POPUP_Z_INDEX = 345;
+const AIRPORT_MARKER_HOVER_Z_INDEX = 350;
+const AIRCRAFT_MARKER_BASE_Z_INDEX = 1000;
+const AIRCRAFT_MARKER_SELECTED_Z_INDEX = 1120;
+const AIRPORT_HOVER_CLEAR_DELAY_MS = 120;
+const AIRPORT_POPUP_GAP_PX = 14;
 const defaultCenter = [22, 18];
 const initialMapUseUserLocation = appConfig.initialMapUseUserLocation !== false;
 const initialMapLocationTimeoutMs = appConfig.initialMapLocationTimeoutMs ?? 6000;
@@ -74,7 +83,7 @@ const mapLoadingConfig = {
     { zoom: 3.5, limit: 50 },
     { zoom: 5.5, limit: 120 },
     { zoom: 6.5, limit: 350 },
-    { zoom: 7.5, limit: 650 },
+    { zoom: 7, limit: 650 },
     { zoom: 8.5, limit: 900 },
     { zoom: 9.5, limit: 1200 },
     { zoom: 10.5, limit: 1600 },
@@ -85,10 +94,12 @@ const mapLoadingConfig = {
     { zoom: 3.5, level: 0 },
     { zoom: 5.5, level: 1 },
     { zoom: 6.5, level: 2 },
-    { zoom: 7.5, level: 3 },
+    { zoom: 7, level: 3 },
     { zoom: 9.5, level: 4 },
     { zoom: 12, level: 5 }
   ],
+  airportShowAllZoom: appConfig.performance?.airportShowAllZoom ?? 7,
+  airportShowAllRequestLimit: appConfig.performance?.airportShowAllRequestLimit ?? 50000,
   regularTrackMinZoom: appConfig.performance?.regularTrackMinZoom ?? 7,
   regularTrackMaxAircraft: appConfig.performance?.regularTrackMaxAircraft ?? 120,
   selectedTrackMaxPoints: appConfig.performance?.selectedTrackMaxPoints ?? 1000,
@@ -679,11 +690,34 @@ function aircraftLabelLimit() {
 }
 
 function airportRenderLimit() {
+  if (airportShowsAllInCurrentViewport()) {
+    return Number.POSITIVE_INFINITY;
+  }
   return steppedValue(mapLoadingConfig.airportLimitByZoom, currentZoom(), "limit");
 }
 
 function airportLevelLimit() {
+  if (airportShowsAllInCurrentViewport()) {
+    return 5;
+  }
   return steppedValue(mapLoadingConfig.airportLevelByZoom, currentZoom(), "level");
+}
+
+function airportShowsAllInCurrentViewport(zoom = currentZoom()) {
+  const threshold = Number(mapLoadingConfig.airportShowAllZoom);
+  return Number.isFinite(threshold) && clampZoom(zoom) >= threshold;
+}
+
+function airportRequestLimit() {
+  return airportShowsAllInCurrentViewport()
+    ? mapLoadingConfig.airportShowAllRequestLimit
+    : airportRenderLimit();
+}
+
+function airportRequestLevelLimit() {
+  return airportShowsAllInCurrentViewport() || airportLayerMode() === "on"
+    ? 5
+    : airportLevelLimit();
 }
 
 function airportPriorityLevel(airport) {
@@ -764,13 +798,18 @@ function airportSizeForZoom(sizeClass, zoom = currentZoom()) {
     }
     return { width: 22, height: 28, hitWidth: 36, hitHeight: 40 };
   }
-  if (clamped < 7.5) {
+  if (clamped < 7) {
     if (visibleClass === "small") {
       return { width: 0, height: 0, hitWidth: 0, hitHeight: 0 };
     }
     return visibleClass === "major"
       ? { width: 24, height: 31, hitWidth: 38, hitHeight: 42 }
       : { width: 18, height: 23, hitWidth: 34, hitHeight: 38 };
+  }
+  if (clamped < 7.5) {
+    if (visibleClass === "major") return { width: 24, height: 31, hitWidth: 38, hitHeight: 42 };
+    if (visibleClass === "medium") return { width: 18, height: 23, hitWidth: 34, hitHeight: 38 };
+    return { width: 14, height: 18, hitWidth: 30, hitHeight: 32 };
   }
   if (clamped < 9.5) {
     if (visibleClass === "major") return { width: 26, height: 34, hitWidth: 40, hitHeight: 44 };
@@ -792,20 +831,519 @@ function airportLayerIsOff() {
   return !state.airports || airportLayerMode() === "off";
 }
 
+function airportMarkerZIndex(airport, options = {}) {
+  if (options.currentHover === true) {
+    return AIRPORT_MARKER_HOVER_Z_INDEX;
+  }
+  if (options.hovered === true) {
+    return airportIsSelected(airport)
+      ? AIRPORT_MARKER_SELECTED_POPUP_Z_INDEX
+      : AIRPORT_MARKER_HOVER_Z_INDEX;
+  }
+  return airportIsSelected(airport)
+    ? AIRPORT_MARKER_SELECTED_Z_INDEX
+    : AIRPORT_MARKER_BASE_Z_INDEX - airportPriorityLevel(airport);
+}
+
+function googleAirportCollisionBehavior(airport, options = {}) {
+  const collisionBehavior = window.google?.maps?.CollisionBehavior;
+  if (!collisionBehavior) {
+    return undefined;
+  }
+  return collisionBehavior.REQUIRED;
+}
+
+function applyGoogleAirportMarkerStacking(marker, airport, options = {}) {
+  if (!marker || !airport) {
+    return;
+  }
+  marker.zIndex = airportMarkerZIndex(airport, options);
+  if ("collisionBehavior" in marker) {
+    const collisionBehavior = googleAirportCollisionBehavior(airport, options);
+    if (collisionBehavior) {
+      marker.collisionBehavior = collisionBehavior;
+    }
+  }
+}
+
+function airportHoverId(id) {
+  return String(id || "").trim();
+}
+
+function selectedAirportPopupId() {
+  return state.selectedKind === "airport" ? airportHoverId(state.selectedId) : "";
+}
+
+function activeAirportPopupIds(fallbackId = state.hoveredAirportId) {
+  return new Set([
+    selectedAirportPopupId(),
+    airportHoverId(fallbackId)
+  ].filter(Boolean));
+}
+
+function airportPopupSize(airport) {
+  const parts = airportHoverLabelParts(airport);
+  const lines = [parts.nameCn, parts.nameEn, airportHoverCodeLine(airport)].filter((value) => value && value !== "N/A");
+  const longest = lines.reduce((max, value) => Math.max(max, String(value).length), 0);
+  const width = Math.min(360, Math.max(220, longest * 6.6 + 28));
+  const height = Math.max(52, lines.length * 18 + 22);
+  return { width, height };
+}
+
+function airportPopupBoxForPlacement(airport, placement = "bottom") {
+  if (!airport || !state.map) {
+    return null;
+  }
+  const point = state.map.project([airport.lat, airport.lng]);
+  const metrics = airportMarkerMetrics(airport);
+  const size = airportPopupSize(airport);
+  const gap = AIRPORT_POPUP_GAP_PX;
+  const anchor = {
+    x: Number(point.x),
+    y: Number(point.y),
+    hitWidth: Number(metrics.hitWidth || 36),
+    hitHeight: Number(metrics.hitHeight || 40)
+  };
+  if (!Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)) {
+    return null;
+  }
+  const boxes = {
+    bottom: {
+      left: anchor.x - size.width / 2,
+      right: anchor.x + size.width / 2,
+      top: anchor.y + gap,
+      bottom: anchor.y + gap + size.height
+    },
+    top: {
+      left: anchor.x - size.width / 2,
+      right: anchor.x + size.width / 2,
+      top: anchor.y - anchor.hitHeight - gap - size.height,
+      bottom: anchor.y - anchor.hitHeight - gap
+    },
+    right: {
+      left: anchor.x + anchor.hitWidth / 2 + gap,
+      right: anchor.x + anchor.hitWidth / 2 + gap + size.width,
+      top: anchor.y - anchor.hitHeight / 2 - size.height / 2,
+      bottom: anchor.y - anchor.hitHeight / 2 + size.height / 2
+    },
+    left: {
+      left: anchor.x - anchor.hitWidth / 2 - gap - size.width,
+      right: anchor.x - anchor.hitWidth / 2 - gap,
+      top: anchor.y - anchor.hitHeight / 2 - size.height / 2,
+      bottom: anchor.y - anchor.hitHeight / 2 + size.height / 2
+    }
+  };
+  return boxes[placement] || boxes.bottom;
+}
+
+function airportPopupViewportPenalty(box) {
+  if (!box || typeof window === "undefined") {
+    return 0;
+  }
+  const margin = 10;
+  const overflowX = Math.max(0, margin - box.left)
+    + Math.max(0, box.right - (window.innerWidth - margin));
+  const overflowY = Math.max(0, margin - box.top)
+    + Math.max(0, box.bottom - (window.innerHeight - margin));
+  return overflowX * 4 + overflowY * 4;
+}
+
+function airportPopupOverlapPenalty(box, blockedBoxes = []) {
+  return blockedBoxes.reduce((penalty, blocked) => {
+    if (!boxesOverlap(box, blocked, 10)) {
+      return penalty;
+    }
+    const overlapX = Math.max(0, Math.min(box.right, blocked.right) - Math.max(box.left, blocked.left));
+    const overlapY = Math.max(0, Math.min(box.bottom, blocked.bottom) - Math.max(box.top, blocked.top));
+    return penalty + 10000 + overlapX * overlapY;
+  }, 0);
+}
+
+function airportPopupElementBox(id) {
+  const active = airportHoverId(id);
+  if (!active || typeof document === "undefined") {
+    return null;
+  }
+  const element = airportMarkerElementsForId(active)
+    .map((marker) => marker.querySelector(".airport-hover-label"))
+    .find((label) => label && getComputedStyle(label).visibility !== "hidden");
+  const rect = element?.getBoundingClientRect();
+  if (!rect || rect.width <= 0 || rect.height <= 0) {
+    return null;
+  }
+  return {
+    left: rect.left,
+    right: rect.right,
+    top: rect.top,
+    bottom: rect.bottom
+  };
+}
+
+function preferredAirportPopupPlacements(airport, activeIds = activeAirportPopupIds()) {
+  const selectedId = selectedAirportPopupId();
+  const currentId = airportHoverId(airport?.id);
+  if (selectedId && currentId && currentId !== selectedId && activeIds.has(selectedId)) {
+    const selected = airportById(selectedId);
+    if (selected && state.map) {
+      const currentPoint = state.map.project([airport.lat, airport.lng]);
+      const selectedPoint = state.map.project([selected.lat, selected.lng]);
+      const dx = Number(currentPoint.x) - Number(selectedPoint.x);
+      const dy = Number(currentPoint.y) - Number(selectedPoint.y);
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        return dx >= 0 ? ["right", "top", "bottom", "left"] : ["left", "top", "bottom", "right"];
+      }
+      return dy >= 0 ? ["bottom", "right", "left", "top"] : ["top", "right", "left", "bottom"];
+    }
+  }
+  return ["bottom", "top", "right", "left"];
+}
+
+function airportPopupPlacement(airport, activeIds = activeAirportPopupIds()) {
+  if (!airport || !state.map) {
+    return "bottom";
+  }
+  const selectedId = selectedAirportPopupId();
+  const currentId = airportHoverId(airport.id);
+  const blockedBoxes = [];
+  if (selectedId && selectedId !== currentId && activeIds.has(selectedId)) {
+    const selected = airportById(selectedId);
+    const selectedBox = airportPopupElementBox(selectedId) || airportPopupBoxForPlacement(selected, "bottom");
+    if (selectedBox) {
+      blockedBoxes.push(selectedBox);
+    }
+  }
+  const preferred = preferredAirportPopupPlacements(airport, activeIds);
+  const candidates = [...new Set([...preferred, "bottom", "top", "right", "left"])];
+  return candidates
+    .map((placement, index) => {
+      const box = airportPopupBoxForPlacement(airport, placement);
+      return {
+        placement,
+        score: airportPopupViewportPenalty(box) + airportPopupOverlapPenalty(box, blockedBoxes) + index
+      };
+    })
+    .sort((first, second) => first.score - second.score)[0]?.placement || "bottom";
+}
+
+function airportPopupPlacementVars(airport, activeIds = activeAirportPopupIds()) {
+  const placement = airportPopupPlacement(airport, activeIds);
+  const gap = `${AIRPORT_POPUP_GAP_PX}px`;
+  const values = {
+    bottom: {
+      left: "50%",
+      top: `calc(var(--airport-hit-height, 40px) + ${gap})`,
+      transform: "translateX(-50%)"
+    },
+    top: {
+      left: "50%",
+      top: `calc(-1 * ${gap})`,
+      transform: "translate(-50%, -100%)"
+    },
+    right: {
+      left: `calc(50% + var(--airport-hit-width, 36px) / 2 + ${gap})`,
+      top: "calc(var(--airport-hit-height, 40px) / 2)",
+      transform: "translateY(-50%)"
+    },
+    left: {
+      left: `calc(50% - var(--airport-hit-width, 36px) / 2 - ${gap})`,
+      top: "calc(var(--airport-hit-height, 40px) / 2)",
+      transform: "translate(-100%, -50%)"
+    }
+  };
+  return { placement, ...(values[placement] || values.bottom) };
+}
+
+function applyAirportPopupPlacementVars(element, airport, activeIds = activeAirportPopupIds()) {
+  if (!element || !airport) {
+    return "";
+  }
+  const vars = airportPopupPlacementVars(airport, activeIds);
+  element.dataset.popupPlacement = vars.placement;
+  element.style.setProperty("--airport-popup-left", vars.left);
+  element.style.setProperty("--airport-popup-top", vars.top);
+  element.style.setProperty("--airport-popup-transform", vars.transform);
+  return `--airport-popup-left:${vars.left}; --airport-popup-top:${vars.top}; --airport-popup-transform:${vars.transform};`;
+}
+
+function airportHoverIsActive(id, activeIds = activeAirportPopupIds()) {
+  return activeIds.has(airportHoverId(id));
+}
+
+function airportPopupCanShow(airport) {
+  if (!airport) {
+    return false;
+  }
+  return !airportHoverNeedsDetail(airport) || !dataService?.isEnabled();
+}
+
+function airportPopupIsReady(id, activeIds = activeAirportPopupIds()) {
+  const airportId = airportHoverId(id);
+  return activeIds.has(airportId) && airportPopupCanShow(airportById(airportId));
+}
+
+function setAirportMarkerHoverClass(element, hovered, popupReady = false, currentHover = false) {
+  if (!element) {
+    return;
+  }
+  element.classList.toggle("is-hovered", hovered);
+  element.classList.toggle("is-popup-ready", popupReady);
+  element.classList.toggle("is-current-hover", currentHover);
+  if (hovered) {
+    element.dataset.hovered = "true";
+  } else {
+    delete element.dataset.hovered;
+  }
+  if (popupReady) {
+    element.dataset.popupReady = "true";
+  } else {
+    delete element.dataset.popupReady;
+  }
+  if (currentHover) {
+    element.dataset.currentHover = "true";
+  } else {
+    delete element.dataset.currentHover;
+  }
+}
+
+function clearAirportHoverCloseTimer() {
+  if (!state.airportHoverClearTimer) {
+    return;
+  }
+  clearTimeout(state.airportHoverClearTimer);
+  state.airportHoverClearTimer = null;
+}
+
+function airportPointerFromEvent(event) {
+  const x = Number(event?.clientX);
+  const y = Number(event?.clientY);
+  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+}
+
+function updateAirportHoverPointer(event) {
+  const point = airportPointerFromEvent(event);
+  if (point) {
+    state.airportHoverPointer = point;
+  }
+}
+
+function airportMarkerElementsForId(id) {
+  const active = airportHoverId(id);
+  if (!active || typeof document === "undefined") {
+    return [];
+  }
+  const elements = Array.from(document.querySelectorAll(".airport-pin"))
+    .filter((element) => airportHoverId(element.dataset.id) === active);
+  const record = state.map?.airportMarkers instanceof Map ? state.map.airportMarkers.get(active) : null;
+  if (record?.content && !elements.includes(record.content)) {
+    elements.push(record.content);
+  }
+  return elements;
+}
+
+function pointInsideElementRect(element, point, padding = 4) {
+  if (!element || !point) {
+    return false;
+  }
+  const rect = element.getBoundingClientRect();
+  if (!rect || rect.width <= 0 || rect.height <= 0) {
+    return false;
+  }
+  return point.x >= rect.left - padding
+    && point.x <= rect.right + padding
+    && point.y >= rect.top - padding
+    && point.y <= rect.bottom + padding;
+}
+
+function pointerStillInsideAirportMarker(id, event) {
+  const point = state.airportHoverPointer || airportPointerFromEvent(event);
+  if (!point) {
+    return false;
+  }
+  return airportMarkerElementsForId(id).some((element) => pointInsideElementRect(element, point));
+}
+
+function scheduleAirportHoverEnd(id, event) {
+  const active = airportHoverId(id);
+  if (!active || state.hoveredAirportId !== active) {
+    return;
+  }
+  clearAirportHoverCloseTimer();
+  state.airportHoverClearTimer = setTimeout(() => {
+    state.airportHoverClearTimer = null;
+    if (state.hoveredAirportId !== active) {
+      return;
+    }
+    if (pointerStillInsideAirportMarker(active, event)) {
+      syncAirportHoverMarkers();
+      return;
+    }
+    state.hoveredAirportId = null;
+    syncAirportHoverMarkers("");
+  }, AIRPORT_HOVER_CLEAR_DELAY_MS);
+}
+
+function syncAirportHoverMarkers(activeId = state.hoveredAirportId) {
+  const activeIds = activeAirportPopupIds(activeId);
+  const currentHoverId = airportHoverId(state.hoveredAirportId);
+  document.querySelectorAll(".airport-pin").forEach((element) => {
+    const markerAirportId = airportHoverId(element.dataset.id);
+    const hovered = activeIds.has(markerAirportId);
+    const currentHover = currentHoverId === markerAirportId;
+    const airport = airportById(markerAirportId);
+    applyAirportPopupPlacementVars(element, airport, activeIds);
+    setAirportMarkerHoverClass(element, hovered, hovered && airportPopupCanShow(airport), currentHover);
+  });
+  if (state.map?.airportMarkers instanceof Map) {
+    state.map.airportMarkers.forEach((record, markerId) => {
+      const markerAirportId = airportHoverId(record.content?.dataset?.id || markerId);
+      const hovered = activeIds.has(markerAirportId);
+      const currentHover = currentHoverId === markerAirportId;
+      const airport = airportById(markerAirportId);
+      applyAirportPopupPlacementVars(record.content, airport, activeIds);
+      setAirportMarkerHoverClass(record.content, hovered, hovered && airportPopupCanShow(airport), currentHover);
+      if (airport) {
+        applyGoogleAirportMarkerStacking(record.marker, airport, { hovered, currentHover });
+      }
+    });
+  }
+}
+
+function beginAirportMarkerHover(id, event) {
+  updateAirportHoverPointer(event);
+  clearAirportHoverCloseTimer();
+  const active = airportHoverId(id);
+  if (!active) {
+    return;
+  }
+  const selectedPopup = selectedAirportPopupId();
+  if (selectedPopup) {
+    if (active !== selectedPopup) {
+      state.hoveredAirportId = active;
+    }
+    syncAirportHoverMarkers();
+    handleAirportMarkerHover(active);
+    return;
+  }
+  state.hoveredAirportId = active;
+  syncAirportHoverMarkers(active);
+  handleAirportMarkerHover(active);
+}
+
+function endAirportMarkerHover(id, event) {
+  const active = airportHoverId(id);
+  if (!active || state.hoveredAirportId !== active) {
+    return;
+  }
+  scheduleAirportHoverEnd(active, event);
+}
+
+function normalizeAirportCodeText(value) {
+  const text = String(value ?? "").trim().toUpperCase();
+  return !text || text === "-" || text === "N/A" ? "" : text;
+}
+
+function airportCodeByLength(length, ...values) {
+  return values
+    .map(normalizeAirportCodeText)
+    .find((value) => value.length === length) || "";
+}
+
+function meaningfulAirportName(value, codeSet, options = {}) {
+  const text = String(displayOrDash(value)).trim();
+  if (!text || text === NA_TEXT || text.toUpperCase() === "N/A") {
+    return "";
+  }
+  const normalized = normalizeAirportCodeText(text);
+  if (normalized && (codeSet.has(normalized) || /^[A-Z0-9]{3,4}$/.test(normalized))) {
+    return "";
+  }
+  if (options.requiresChinese && !/[\u4e00-\u9fff]/.test(text)) {
+    return "";
+  }
+  return text;
+}
+
+function firstMeaningfulAirportName(codeSet, options, ...values) {
+  return values
+    .map((value) => meaningfulAirportName(value, codeSet, options))
+    .find(Boolean) || "N/A";
+}
+
+function airportHoverLabelParts(airport) {
+  const detailInfo = airport.apiDetail?.airportInfo || {};
+  const raw = airport.raw || {};
+  const iata = airportCodeByLength(3, detailInfo.airportCode, raw.airportCode, airport.airportCode, airport.iata);
+  const icao = airportCodeByLength(4, detailInfo.icaoCode, raw.icaoCode, airport.icaoCode, airport.icao, airport.id);
+  const codeSet = new Set([iata, icao, normalizeAirportCodeText(airport.id), normalizeAirportCodeText(airport.airportCode)].filter(Boolean));
+  const nameCn = firstMeaningfulAirportName(
+    codeSet,
+    { requiresChinese: true },
+    detailInfo.airportName,
+    raw.airportName,
+    detailInfo.airportFourName,
+    raw.airportFourName,
+    airport.nameCn,
+    airport.nameZh
+  );
+  const nameEn = firstMeaningfulAirportName(
+    codeSet,
+    {},
+    detailInfo.airportNameEn,
+    raw.airportNameEn,
+    airport.nameEn,
+    airport.name
+  );
+  return {
+    nameCn,
+    nameEn,
+    iata: iata || "N/A",
+    icao: icao || "N/A"
+  };
+}
+
 function airportDisplayCode(airport) {
-  const iata = airport.iata && airport.iata !== airport.id ? airport.iata : "";
-  const icao = airport.icaoCode || airport.id;
-  return iata ? `${iata}/${icao}` : icao || airport.id || "-";
+  const { iata, icao } = airportHoverLabelParts(airport);
+  if (iata !== "N/A" && icao !== "N/A") {
+    return `${iata} / ${icao}`;
+  }
+  return icao !== "N/A" ? icao : iata !== "N/A" ? iata : airport.id || "-";
+}
+
+function airportHoverCodeLine(airport) {
+  const { iata, icao } = airportHoverLabelParts(airport);
+  if (iata !== "N/A" && icao !== "N/A") {
+    return `${iata} / ${icao}`;
+  }
+  if (iata !== "N/A") {
+    return iata;
+  }
+  if (icao !== "N/A") {
+    return icao;
+  }
+  return "N/A";
 }
 
 function airportFullLabel(airport) {
-  const name = airport.name || airport.city || airport.id || "-";
-  return `${name} ${airportDisplayCode(airport)}`;
+  const { nameCn, nameEn } = airportHoverLabelParts(airport);
+  return [
+    nameCn,
+    nameEn,
+    airportHoverCodeLine(airport)
+  ].filter((value) => value && value !== "N/A").join(" · ") || airport.id || "-";
+}
+
+function airportHoverLabelHtml(airport) {
+  const { nameCn, nameEn } = airportHoverLabelParts(airport);
+  return [
+    nameCn !== "N/A" ? `<span class="airport-hover-name-cn">${escapeHtml(nameCn)}</span>` : "",
+    nameEn !== "N/A" ? `<span class="airport-hover-name-en">${escapeHtml(nameEn)}</span>` : "",
+    `<span class="airport-hover-code-line">${escapeHtml(airportHoverCodeLine(airport))}</span>`
+  ].filter(Boolean).join("");
 }
 
 function desiredAirportLabelMode(airport) {
   if (airportIsSelected(airport)) {
-    return currentZoom() < 8.5 ? "code" : "full";
+    return "none";
   }
   if (!state.labels) {
     return "none";
@@ -1324,6 +1862,9 @@ const state = {
   airportLoadedAt: null,
   airportDataStatus: liveDataOnly ? "loading" : "local",
   airportDataError: null,
+  hoveredAirportId: null,
+  airportHoverClearTimer: null,
+  airportHoverPointer: null,
   detailLoads: new Set(),
   aircraftProfileDetails: new Map(),
   iconTypeCodeProfiles: {
@@ -1338,6 +1879,7 @@ const state = {
     retryAfterMs: 30000
   },
   routeColorMode: "altitude",
+  speedAltitudeUnit: "imperial",
   renderedAircraft: [],
   renderedAirports: [],
   groundProjectionSyncTimer: null,
@@ -1559,7 +2101,7 @@ class LeafletMapEngine {
       return;
     }
     const layers = record.cores instanceof Map
-      ? [...record.cores.values(), ...(record.halos || []), record.planned]
+      ? [...record.cores.values(), ...(record.halos || []), ...(record.hits?.values?.() || []), record.planned, record.plannedHit]
       : Array.isArray(record.layers)
         ? record.layers
         : [record];
@@ -1594,12 +2136,14 @@ class LeafletMapEngine {
       stale: options.stale === true
     });
     const segments = hasTrackPoints ? trackSegments(points, selected) : [];
-    const record = state.tracks.get(id) || { cores: new Map(), halos: [], planned: null };
+    const record = state.tracks.get(id) || { cores: new Map(), halos: [], hits: new Map(), planned: null, plannedHit: null };
     if (!(record.cores instanceof Map)) {
       this.clearTrackRecord(record);
       record.cores = new Map();
       record.halos = [];
+      record.hits = new Map();
       record.planned = null;
+      record.plannedHit = null;
     }
     if (plannedPath) {
       const plannedStyle = {
@@ -1619,9 +2163,19 @@ class LeafletMapEngine {
         record.planned.setLatLngs(plannedPath);
         record.planned.setStyle(plannedStyle);
       }
-    } else if (record.planned) {
-      this.map.removeLayer(record.planned);
+      if (record.plannedHit) {
+        this.map.removeLayer(record.plannedHit);
+        record.plannedHit = null;
+      }
+    } else if (record.planned || record.plannedHit) {
+      if (record.planned) {
+        this.map.removeLayer(record.planned);
+      }
       record.planned = null;
+      if (record.plannedHit) {
+        this.map.removeLayer(record.plannedHit);
+        record.plannedHit = null;
+      }
     }
     const haloPaths = routeStyle.haloEnabled && selected ? actualTrackPaths(segments) : [];
     haloPaths.forEach((path, index) => {
@@ -1675,10 +2229,20 @@ class LeafletMapEngine {
         core.setStyle(style);
       }
     });
+    if (record.hits?.size) {
+      record.hits.forEach((hit) => this.map.removeLayer(hit));
+      record.hits.clear();
+    }
     record.cores.forEach((core, segmentId) => {
       if (!activeSegmentIds.has(segmentId)) {
         this.map.removeLayer(core);
         record.cores.delete(segmentId);
+      }
+    });
+    record.hits?.forEach((hit, segmentId) => {
+      if (!selected || !activeSegmentIds.has(segmentId)) {
+        this.map.removeLayer(hit);
+        record.hits.delete(segmentId);
       }
     });
     if (selected) {
@@ -2010,7 +2574,7 @@ class GoogleMapEngine {
       position: { lat: position[0], lng: position[1] },
       content,
       title: aircraftMapMarkerTitle(jet),
-      zIndex: 200,
+      zIndex: aircraftMarkerZIndex(jet),
       anchorLeft: `-${metrics.hitSize / 2}px`,
       anchorTop: `-${metrics.hitSize / 2}px`,
       gmpClickable: true,
@@ -2075,7 +2639,7 @@ class GoogleMapEngine {
       record.marker.position = { lat: position[0], lng: position[1] };
       record.marker.title = aircraftMapMarkerTitle(jet);
       record.marker.map = this.map;
-      record.marker.zIndex = aircraftIsSelected(jet) ? 420 : 220 - Math.min(160, Math.round(aircraftPriority(jet) / 10000));
+      record.marker.zIndex = aircraftMarkerZIndex(jet);
       if ("anchorLeft" in record.marker) {
         record.marker.anchorLeft = `-${metrics.hitSize / 2}px`;
       }
@@ -2112,12 +2676,11 @@ class GoogleMapEngine {
       map: this.map,
       position: { lat: airport.lat, lng: airport.lng },
       content,
-      title: `${airport.id} ${airport.name}`,
-      zIndex: 120,
+      zIndex: airportMarkerZIndex(airport),
       anchorLeft: "-50%",
       anchorTop: "-100%",
       gmpClickable: true,
-      collisionBehavior: google.maps.CollisionBehavior?.OPTIONAL_AND_HIDES_LOWER_PRIORITY
+      collisionBehavior: googleAirportCollisionBehavior(airport)
     });
     marker.addEventListener("gmp-click", () => selectAirport(airport.id));
     return {
@@ -2128,16 +2691,22 @@ class GoogleMapEngine {
 
   updateAirportContent(content, airport) {
     const { metrics } = airportMarkerCssVars(airport);
+    const activeIds = activeAirportPopupIds();
+    const hovered = airportHoverIsActive(airport.id, activeIds);
+    const popupReady = airportPopupIsReady(airport.id, activeIds);
+    const currentHover = airportHoverId(state.hoveredAirportId) === airportHoverId(airport.id);
     content.className = `native-map-marker ${airportMarkerClass(airport, metrics)}`;
+    setAirportMarkerHoverClass(content, hovered, popupReady, currentHover);
     content.dataset.id = airport.id;
     content.dataset.level = String(airportPriorityLevel(airport));
     content.dataset.markerSize = metrics.sizeClass;
-    content.setAttribute("aria-label", `${airport.id} ${airport.name}`);
-    content.setAttribute("title", airportFullLabel(airport));
+    content.setAttribute("aria-label", airportFullLabel(airport));
+    content.removeAttribute("title");
     content.style.setProperty("--airport-icon-width", `${metrics.visualWidth}px`);
     content.style.setProperty("--airport-icon-height", `${metrics.visualHeight}px`);
     content.style.setProperty("--airport-hit-width", `${metrics.hitWidth}px`);
     content.style.setProperty("--airport-hit-height", `${metrics.hitHeight}px`);
+    applyAirportPopupPlacementVars(content, airport, activeIds);
     if (!content.dataset.ready) {
       content.innerHTML = `
         <span class="airport-marker-hit">
@@ -2150,12 +2719,15 @@ class GoogleMapEngine {
           <span class="airport-hover-label"></span>
         </span>
       `;
+      content.addEventListener("mouseenter", (event) => beginAirportMarkerHover(content.dataset.id, event));
+      content.addEventListener("mousemove", updateAirportHoverPointer);
+      content.addEventListener("mouseleave", (event) => endAirportMarkerHover(content.dataset.id, event));
       content.dataset.ready = "true";
     }
     content.querySelector(".airport-code-label").textContent = airport.renderLabelMode === "full"
       ? airportFullLabel(airport)
       : airportDisplayCode(airport);
-    content.querySelector(".airport-hover-label").textContent = airportFullLabel(airport);
+    content.querySelector(".airport-hover-label").innerHTML = airportHoverLabelHtml(airport);
   }
 
   renderAirportMarkers(airportList) {
@@ -2172,12 +2744,10 @@ class GoogleMapEngine {
       this.updateAirportContent(record.content, airport);
       record.marker.position = { lat: airport.lat, lng: airport.lng };
       record.marker.map = this.map;
-      record.marker.zIndex = airportIsSelected(airport) ? 410 : 120 - airportPriorityLevel(airport);
-      if ("collisionBehavior" in record.marker && google.maps.CollisionBehavior) {
-        record.marker.collisionBehavior = airportIsSelected(airport)
-          ? google.maps.CollisionBehavior.REQUIRED
-          : google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY;
-      }
+      applyGoogleAirportMarkerStacking(record.marker, airport, {
+        hovered: airportHoverIsActive(airport.id),
+        currentHover: airportHoverId(state.hoveredAirportId) === airportHoverId(airport.id)
+      });
     });
 
     this.airportMarkers.forEach((record, id) => {
@@ -2249,7 +2819,7 @@ class GoogleMapEngine {
       return;
     }
     const lines = record.cores instanceof Map
-      ? [...record.cores.values(), ...(record.halos || []), record.planned]
+      ? [...record.cores.values(), ...(record.halos || []), ...(record.hits?.values?.() || []), record.planned, record.plannedHit]
       : Array.isArray(record.lines)
         ? record.lines
         : [record];
@@ -2280,12 +2850,14 @@ class GoogleMapEngine {
       stale: options.stale === true
     });
     const segments = hasTrackPoints ? trackSegments(points, selected) : [];
-    const record = this.lines.get(id) || { cores: new Map(), halos: [], planned: null };
+    const record = this.lines.get(id) || { cores: new Map(), halos: [], hits: new Map(), planned: null, plannedHit: null };
     if (!(record.cores instanceof Map)) {
       this.clearTrackRecord(record);
       record.cores = new Map();
       record.halos = [];
+      record.hits = new Map();
       record.planned = null;
+      record.plannedHit = null;
     }
     if (plannedPath) {
       const path = plannedPath.map(([lat, lng]) => ({ lat, lng }));
@@ -2315,9 +2887,15 @@ class GoogleMapEngine {
         record.planned.setPath(path);
         record.planned.setOptions(plannedOptions);
       }
-    } else if (record.planned) {
-      record.planned.setMap(null);
+      if (record.plannedHit) {
+        record.plannedHit.setMap(null);
+        record.plannedHit = null;
+      }
+    } else if (record.planned || record.plannedHit) {
+      record.planned?.setMap(null);
       record.planned = null;
+      record.plannedHit?.setMap(null);
+      record.plannedHit = null;
     }
     const haloPaths = routeStyle.haloEnabled && selected ? actualTrackPaths(segments) : [];
     haloPaths.forEach((segmentPath, index) => {
@@ -2386,10 +2964,20 @@ class GoogleMapEngine {
         core.setOptions(options);
       }
     });
+    if (record.hits?.size) {
+      record.hits.forEach((hit) => hit.setMap(null));
+      record.hits.clear();
+    }
     record.cores.forEach((core, segmentId) => {
       if (!activeSegmentIds.has(segmentId)) {
         core.setMap(null);
         record.cores.delete(segmentId);
+      }
+    });
+    record.hits?.forEach((hit, segmentId) => {
+      if (!selected || !activeSegmentIds.has(segmentId)) {
+        hit.setMap(null);
+        record.hits.delete(segmentId);
       }
     });
     this.lines.set(id, record);
@@ -3289,6 +3877,13 @@ function aircraftPriority(jet) {
   return score;
 }
 
+function aircraftMarkerZIndex(jet) {
+  if (aircraftIsSelected(jet)) {
+    return AIRCRAFT_MARKER_SELECTED_Z_INDEX;
+  }
+  return AIRCRAFT_MARKER_BASE_Z_INDEX - Math.min(160, Math.max(0, Math.round(aircraftPriority(jet) / 10000)));
+}
+
 function desiredAircraftLabelMode(jet) {
   if (aircraftIsSelected(jet)) {
     return "callsign";
@@ -3324,15 +3919,16 @@ function estimateAircraftLabelBox(jet, labelMode) {
   }
   const metrics = aircraftMarkerMetrics(jet);
   const text = aircraftMapLabelText(jet);
-  const width = Math.min(112, Math.max(46, String(text).length * 7.2 + 14));
+  const width = Math.min(104, Math.max(46, String(text).length * 7.2 + 16));
   const height = 20;
-  const left = point.x - metrics.hitSize / 2 + metrics.labelLeft;
-  const top = point.y - 9;
+  const left = point.x - width / 2;
+  const bottom = point.y - metrics.visualSize / 2 - metrics.labelGap;
+  const top = bottom - height;
   return {
     left,
     right: left + width,
     top,
-    bottom: top + height
+    bottom
   };
 }
 
@@ -3478,13 +4074,15 @@ function aircraftMarkerMetrics(jet) {
   const visualSize = selected ? Math.min(baseSize + 3, 63) : baseSize;
   const hitPadding = selected ? 6 : 4;
   const hitSize = Math.round(Math.max(visualSize + hitPadding, 26) * 10) / 10;
+  const labelGap = selected ? 5 : 4;
   return {
     iconKey,
     iconStyle: aircraftIconStyle(jet),
     sizeClass,
     visualSize,
     hitSize,
-    labelLeft: Math.round(hitSize / 2 + 8),
+    labelGap,
+    labelBottom: Math.round(((hitSize + visualSize) / 2 + labelGap) * 10) / 10,
     labelHidden: jet.renderLabelMode === "none" || (!jet.renderLabelMode && zoom < 5.5 && !selected)
   };
 }
@@ -3494,7 +4092,7 @@ function aircraftMarkerCssVars(jet) {
   const iconStyle = metrics.iconStyle;
   return {
     metrics,
-    cssText: `--aircraft-icon-size:${metrics.visualSize}px; --aircraft-hit-size:${metrics.hitSize}px; --aircraft-label-left:${metrics.labelLeft}px; --aircraft-fill:${iconStyle.fill}; --aircraft-stroke:${iconStyle.stroke};`
+    cssText: `--aircraft-icon-size:${metrics.visualSize}px; --aircraft-hit-size:${metrics.hitSize}px; --aircraft-label-bottom:${metrics.labelBottom}px; --aircraft-label-gap:${metrics.labelGap}px; --aircraft-fill:${iconStyle.fill}; --aircraft-stroke:${iconStyle.stroke};`
   };
 }
 
@@ -3514,7 +4112,8 @@ function applyAircraftMarkerStyle(element, jet) {
   const { metrics } = aircraftMarkerCssVars(jet);
   element.style.setProperty("--aircraft-icon-size", `${metrics.visualSize}px`);
   element.style.setProperty("--aircraft-hit-size", `${metrics.hitSize}px`);
-  element.style.setProperty("--aircraft-label-left", `${metrics.labelLeft}px`);
+  element.style.setProperty("--aircraft-label-bottom", `${metrics.labelBottom}px`);
+  element.style.setProperty("--aircraft-label-gap", `${metrics.labelGap}px`);
   element.style.setProperty("--aircraft-fill", metrics.iconStyle.fill);
   element.style.setProperty("--aircraft-stroke", metrics.iconStyle.stroke);
   return metrics;
@@ -3609,39 +4208,95 @@ function syntheticTrackValue(jet, index, total, key) {
   return cruiseValue;
 }
 
+function arrayTrackLatLng(point) {
+  const first = Number(point?.[0]);
+  const second = Number(point?.[1]);
+  if (!Number.isFinite(first) || !Number.isFinite(second)) {
+    return null;
+  }
+  const firstLooksLat = Math.abs(first) <= 90 && Math.abs(second) <= 180;
+  const secondLooksLat = Math.abs(second) <= 90 && Math.abs(first) <= 180;
+  if (firstLooksLat || !secondLooksLat) {
+    return { lat: first, lng: second };
+  }
+  return { lat: second, lng: first };
+}
+
+function valueLooksLikeTrackTime(value) {
+  if (typeof value === "string" && /[-T:\s]/.test(value.trim())) {
+    return parseTrackTime(value) !== null;
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && Math.abs(numeric) > 100000000;
+}
+
+function arrayTrackPointMetrics(point, jet, index, total) {
+  const third = point?.[2];
+  const fourth = point?.[3];
+  const fifth = point?.[4];
+  const sixth = point?.[5];
+  const thirdIsTime = valueLooksLikeTrackTime(third);
+  const fourthIsTime = valueLooksLikeTrackTime(fourth);
+  const fifthIsTime = valueLooksLikeTrackTime(fifth);
+  const hasMetricSlots = point.length >= 5 || (!thirdIsTime && !fourthIsTime && point.length >= 4);
+  const altitudeValue = thirdIsTime
+    ? fourth
+    : fourthIsTime
+      ? null
+      : hasMetricSlots
+        ? third
+        : null;
+  const speedValue = thirdIsTime
+    ? fifth
+    : fourthIsTime
+      ? null
+      : hasMetricSlots
+        ? fourth
+        : null;
+  const headingValue = thirdIsTime || point.length >= 5 ? sixth : fourthIsTime ? third : null;
+  return {
+    altitudeFt: normalizeAltitudeFeet(altitudeValue, syntheticTrackValue(jet, index, total, "altitude")),
+    groundSpeedKt: normalizeSpeedKnots(speedValue, syntheticTrackValue(jet, index, total, "speed")),
+    heading: Number(headingValue ?? jet.heading),
+    timestamp: parseTrackTime(thirdIsTime ? third : fourthIsTime ? fourth : fifthIsTime ? fifth : null)
+  };
+}
+
 function normalizeTrackPoint(point, jet, index, total) {
-  const lat = Array.isArray(point) ? Number(point[0]) : Number(point?.lat ?? point?.latitude);
-  const lng = Array.isArray(point) ? Number(point[1]) : Number(point?.lng ?? point?.lon ?? point?.longitude);
+  const arrayPoint = Array.isArray(point);
+  const arrayCoordinates = arrayPoint ? arrayTrackLatLng(point) : null;
+  const lat = arrayPoint ? Number(arrayCoordinates?.lat) : Number(point?.lat ?? point?.latitude);
+  const lng = arrayPoint ? Number(arrayCoordinates?.lng) : Number(point?.lng ?? point?.lon ?? point?.longitude);
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90) {
     return null;
   }
-  const arrayPoint = Array.isArray(point);
+  const arrayMetrics = arrayPoint ? arrayTrackPointMetrics(point, jet, index, total) : null;
   const pointAltitudeFt = trackNumericValue(point?.altitudeFt);
-  const pointAltitudeM = trackNumericValue(point?.altitudeM);
-  const pointSpeedKt = trackNumericValue(point?.groundSpeedKt ?? point?.speedKt);
+  const pointAltitudeM = trackNumericValue(point?.altitudeM ?? point?.heightM);
+  const pointSpeedKt = trackNumericValue(point?.groundSpeedKt ?? point?.speedKt ?? point?.groundSpeed ?? point?.gs);
   const pointSpeedKmh = trackNumericValue(point?.speedKmh);
   const altitudeFt = arrayPoint
-    ? syntheticTrackValue(jet, index, total, "altitude")
+    ? arrayMetrics.altitudeFt
     : pointAltitudeFt !== null
       ? pointAltitudeFt
       : pointAltitudeM !== null
         ? pointAltitudeM * 3.28084
-        : normalizeAltitudeFeet(point.altitude, null);
+        : normalizeAltitudeFeet(point.altitude ?? point.alt ?? point.height ?? point.baroAltitude, null);
   const groundSpeedKt = arrayPoint
-    ? syntheticTrackValue(jet, index, total, "speed")
+    ? arrayMetrics.groundSpeedKt
     : pointSpeedKt !== null
       ? pointSpeedKt
       : pointSpeedKmh !== null
         ? pointSpeedKmh * 0.539957
-        : normalizeSpeedKnots(point.speed, null);
+        : normalizeSpeedKnots(point.speed ?? point.velocity, null);
   const isEstimated = Boolean(point?.isEstimated || point?.estimated || point?.quality === "estimated");
   return {
     lat,
     lng: normalizeLongitude(lng),
     altitudeFt: trackNumericValue(altitudeFt),
     groundSpeedKt: trackNumericValue(groundSpeedKt),
-    heading: Number(point?.heading ?? point?.course ?? jet.heading),
-    timestamp: parseTrackTime(point?.timestamp ?? point?.createTime ?? point?.time),
+    heading: Number(arrayPoint ? arrayMetrics.heading : point?.heading ?? point?.course ?? point?.track ?? point?.bearing ?? jet.heading),
+    timestamp: arrayPoint ? arrayMetrics.timestamp : parseTrackTime(point?.timestamp ?? point?.createTime ?? point?.time ?? point?.sampleTime ?? point?.positionTime),
     source: point?.source || point?.userMark || "",
     isEstimated,
     estimatedToNext: Boolean(point?.estimatedToNext),
@@ -4117,6 +4772,32 @@ function trackPointHasSemanticBoundary(point, previous) {
     || Boolean(previous && (trackEstimationReason(previous, point) || trackBreakReason(previous, point)));
 }
 
+function trackSpanHasSemanticBoundary(points, startIndex, endIndex) {
+  for (let index = startIndex + 1; index <= endIndex; index += 1) {
+    if (trackPointHasSemanticBoundary(points[index], points[index - 1])) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function sampledTrackPointForRender(points, indexes, outputIndex) {
+  const sourceIndex = indexes[outputIndex];
+  const point = points[sourceIndex];
+  const nextSourceIndex = indexes[outputIndex + 1];
+  if (
+    !Number.isFinite(nextSourceIndex)
+      || nextSourceIndex <= sourceIndex + 1
+      || trackSpanHasSemanticBoundary(points, sourceIndex, nextSourceIndex)
+  ) {
+    return point;
+  }
+  return {
+    ...point,
+    renderActualToNext: true
+  };
+}
+
 function sampledTrackPoints(points, maxPoints) {
   if (!Array.isArray(points) || points.length <= maxPoints) {
     return points;
@@ -4143,9 +4824,8 @@ function sampledTrackPoints(points, maxPoints) {
   for (let index = 0; index < points.length && requiredIndexes.size < targetCount; index += 1) {
     requiredIndexes.add(index);
   }
-  return [...requiredIndexes]
-    .sort((a, b) => a - b)
-    .map((index) => points[index]);
+  const indexes = [...requiredIndexes].sort((a, b) => a - b);
+  return indexes.map((_, outputIndex) => sampledTrackPointForRender(points, indexes, outputIndex));
 }
 
 function trackPointsForRender(jet, selected) {
@@ -4210,6 +4890,9 @@ function trackEstimationReason(start, end) {
   }
   if (start.isEstimated || end.isEstimated || start.quality === "estimated" || end.quality === "estimated") {
     return start.estimatedReason || end.estimatedReason || "estimated";
+  }
+  if (start.renderActualToNext) {
+    return "";
   }
   const elapsedMs = trackSegmentElapsedMs(start, end);
   if (elapsedMs === null) {
@@ -4341,6 +5024,36 @@ function actualTrackPaths(segments) {
   return paths;
 }
 
+function trackReasonLabel(reason) {
+  const labels = {
+    actual: "Actual",
+    estimated: "Estimated",
+    coverage_gap: "Coverage gap",
+    interrupted_gap: "Interrupted gap",
+    latest_position_gap: "Live tail gap",
+    invalid_quality: "Invalid",
+    planned_route: "Planned",
+    planned_destination: "Destination link"
+  };
+  return labels[reason] || displayOrDash(reason);
+}
+
+function formatTrackDistanceNm(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return NA_TEXT;
+  }
+  return `${numeric < 10 ? numeric.toFixed(1) : Math.round(numeric)} nm`;
+}
+
+function formatTrackElapsed(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return NA_TEXT;
+  }
+  return formatDuration(numeric);
+}
+
 function clearAllRenderedTracks() {
   state.map?.removeInactiveTracks?.(new Set());
 }
@@ -4464,6 +5177,8 @@ function updateAircraftIconDiagnostics(aircraftList = []) {
 function renderAirports() {
   const airportLayer = document.getElementById("airportLayer");
   if (!state.airports && !selectedAirport()) {
+    state.hoveredAirportId = null;
+    syncAirportHoverMarkers("");
     state.renderedAirports = [];
     if (state.map.renderAirportMarkers) {
       state.map.renderAirportMarkers([]);
@@ -4473,6 +5188,9 @@ function renderAirports() {
     return;
   }
   const airportMarkers = airportsForCurrentView();
+  if (state.hoveredAirportId && !airportMarkers.some((airport) => airport.id === state.hoveredAirportId)) {
+    state.hoveredAirportId = null;
+  }
   state.renderedAirports = airportMarkers;
   if (state.map.renderAirportMarkers) {
     state.map.renderAirportMarkers(airportMarkers);
@@ -4481,23 +5199,49 @@ function renderAirports() {
   airportLayer.innerHTML = airportMarkers.map((airport) => {
     const point = state.map.project([airport.lat, airport.lng]);
     const { metrics, cssText } = airportMarkerCssVars(airport);
+    const activeIds = activeAirportPopupIds();
+    const hoveredClass = airportHoverIsActive(airport.id, activeIds) ? " is-hovered" : "";
+    const popupReadyClass = airportPopupIsReady(airport.id, activeIds) ? " is-popup-ready" : "";
+    const currentHover = airportHoverId(state.hoveredAirportId) === airportHoverId(airport.id);
+    const currentHoverClass = currentHover ? " is-current-hover" : "";
+    const currentHoverAttr = currentHover ? ' data-current-hover="true"' : "";
+    const popupVars = airportPopupPlacementVars(airport, activeIds);
+    const popupCssText = `--airport-popup-left:${popupVars.left}; --airport-popup-top:${popupVars.top}; --airport-popup-transform:${popupVars.transform};`;
     return `
-      <button type="button" class="${airportMarkerClass(airport, metrics)}" data-id="${airport.id}" data-level="${airportPriorityLevel(airport)}" style="left:${point.x}px; top:${point.y}px; ${cssText}" aria-label="${airport.id} ${airport.name}" title="${airportFullLabel(airport)}">
+      <button type="button" class="${airportMarkerClass(airport, metrics)}${hoveredClass}${popupReadyClass}${currentHoverClass}" data-id="${airport.id}" data-level="${airportPriorityLevel(airport)}" data-popup-placement="${popupVars.placement}"${currentHoverAttr} style="left:${point.x}px; top:${point.y}px; ${cssText} ${popupCssText}" aria-label="${escapeHtml(airportFullLabel(airport))}">
         <span class="airport-marker-hit">
           <span class="marker-map-shadow airport-map-shadow" aria-hidden="true"></span>
           <svg class="airport-pin-icon" viewBox="0 0 28 36" aria-hidden="true">
             <path class="airport-pin-body" d="M14 1.8C7.1 1.8 2.3 6.8 2.3 13.2c0 7.8 9.2 19 11 21a.95.95 0 0 0 1.4 0c1.8-2 11-13.2 11-21C25.7 6.8 20.9 1.8 14 1.8Z"></path>
             <path class="airport-pin-tower" d="M12.4 8.5h3.2l.8 4.1h2.1v2.2h-1.7l.9 4.8h1.5v2.2H8.8v-2.2h1.5l.9-4.8H9.5v-2.2h2.1l.8-4.1Zm.5 11.1h2.2l-.8-4.8h-.6l-.8 4.8Zm.2-7h1.8l-.3-1.8h-1.2l-.3 1.8Z"></path>
           </svg>
-          <span class="airport-code-label">${airport.renderLabelMode === "full" ? airportFullLabel(airport) : airportDisplayCode(airport)}</span>
-          <span class="airport-hover-label">${airportFullLabel(airport)}</span>
+          <span class="airport-code-label">${escapeHtml(airport.renderLabelMode === "full" ? airportFullLabel(airport) : airportDisplayCode(airport))}</span>
+          <span class="airport-hover-label">${airportHoverLabelHtml(airport)}</span>
         </span>
       </button>
     `;
   }).join("");
   airportLayer.querySelectorAll(".airport-pin").forEach((button) => {
     button.addEventListener("click", () => selectAirport(button.dataset.id));
+    button.addEventListener("mouseenter", (event) => beginAirportMarkerHover(button.dataset.id, event));
+    button.addEventListener("mousemove", updateAirportHoverPointer);
+    button.addEventListener("mouseleave", (event) => endAirportMarkerHover(button.dataset.id, event));
   });
+}
+
+function airportHoverNeedsDetail(airport) {
+  if (!airport || airport.apiDetail) {
+    return false;
+  }
+  const parts = airportHoverLabelParts(airport);
+  return parts.nameCn === "N/A" || parts.nameEn === "N/A" || parts.icao === "N/A";
+}
+
+function handleAirportMarkerHover(id) {
+  const airport = airportById(id);
+  if (airportHoverNeedsDetail(airport)) {
+    loadAirportDetail(airport);
+  }
 }
 
 function airportsForCurrentView() {
@@ -4609,6 +5353,36 @@ function formatFlightLevel(value) {
 
 function formatSpeed(value) {
   return finiteNumber(value) ? `${Math.round(Number(value))} kt` : NA_TEXT;
+}
+
+function chartUnitMode() {
+  return state.speedAltitudeUnit === "metric" ? "metric" : "imperial";
+}
+
+function chartUnitLabels(unit = chartUnitMode()) {
+  return unit === "metric"
+    ? { altitude: "M", speed: "KMH" }
+    : { altitude: "FT", speed: "KT" };
+}
+
+function formatChartAltitude(value, unit = chartUnitMode()) {
+  if (!finiteNumber(value)) {
+    return NA_TEXT;
+  }
+  const numeric = Number(value);
+  return unit === "metric"
+    ? `${formatNumber(Math.round(numeric * 0.3048))} m`
+    : `${formatNumber(Math.round(numeric))} ft`;
+}
+
+function formatChartSpeed(value, unit = chartUnitMode()) {
+  if (!finiteNumber(value)) {
+    return NA_TEXT;
+  }
+  const numeric = Number(value);
+  return unit === "metric"
+    ? `${formatNumber(Math.round(numeric * 1.852))} km/h`
+    : `${Math.round(numeric)} kt`;
 }
 
 function formatVerticalSpeed(value) {
@@ -5327,6 +6101,46 @@ function roundedCoordinate(value) {
   return Math.round(Number(value) * 1000000) / 1000000;
 }
 
+function buildAirportViewportRequest(reason = "timer") {
+  const bounds = currentViewportBounds(mapLoadingConfig.viewportPaddingRatio);
+  const selected = selectedAirport();
+  return {
+    north: roundedCoordinate(bounds.north),
+    south: roundedCoordinate(bounds.south),
+    west: roundedCoordinate(bounds.west),
+    east: roundedCoordinate(bounds.east),
+    zoom: Math.round(currentZoom() * 100) / 100,
+    viewportPaddingRatio: mapLoadingConfig.viewportPaddingRatio,
+    airportScope: "viewport",
+    airportLayerMode: airportLayerMode(),
+    maxAirports: airportRequestLimit(),
+    displayLevelMax: airportRequestLevelLimit(),
+    includeLabels: currentZoom() >= 8.5,
+    selectedAirportCode: selected?.icaoCode || selected?.id || selected?.iata || "",
+    businessJetOnly: false,
+    includeAirports: true,
+    includeAircraft: false,
+    reason
+  };
+}
+
+function buildAirportViewportRequestMetadata() {
+  const request = buildAirportViewportRequest("viewport-metadata");
+  return {
+    airportNorth: request.north,
+    airportSouth: request.south,
+    airportWest: request.west,
+    airportEast: request.east,
+    airportScope: request.airportScope,
+    airportLayerMode: request.airportLayerMode,
+    maxAirports: request.maxAirports,
+    displayLevelMax: request.displayLevelMax,
+    includeLabels: request.includeLabels,
+    selectedAirportCode: request.selectedAirportCode,
+    businessJetOnly: request.businessJetOnly
+  };
+}
+
 function buildAircraftViewportRequest(reason = "timer") {
   const bounds = aircraftRequestBounds();
   const selected = selectedAircraft();
@@ -5343,6 +6157,7 @@ function buildAircraftViewportRequest(reason = "timer") {
     categories: "J",
     includeAircraft: true,
     includeAirports: true,
+    ...buildAirportViewportRequestMetadata(),
     includeGround: mapLoadingConfig.showAllAircraftIconsAtAllZooms || currentZoom() >= 8.5,
     sinceVersion: state.aircraftViewportVersion || "",
     selectedUniqueKey: selected?.uniqueKey || selected?.id || "",
@@ -5542,11 +6357,7 @@ async function refreshAirportData(reason = "timer") {
   state.airportLoading = true;
   updateDataSourceLabels();
   try {
-    const snapshot = await dataService.getRealtimeSnapshot({
-      includeAirports: true,
-      includeAircraft: false,
-      reason: `airport-${reason}`
-    });
+    const snapshot = await dataService.getRealtimeSnapshot(buildAirportViewportRequest(`airport-${reason}`));
     if (Array.isArray(snapshot.airports)) {
       replaceAirportData(snapshot.airports);
       state.airportLoadedAt = snapshot.loadedAt;
@@ -5599,7 +6410,7 @@ async function refreshRealtimeData(reason = "timer") {
     }
     applyRealtimeSnapshot(snapshot);
     if (state.selectedKind === "aircraft" && state.selectedId) {
-      selectAircraft(state.selectedId, false);
+      selectAircraft(state.selectedId, false, { preserveReducedIconState: true });
     } else if (state.selectedKind === "airport" && state.selectedId) {
       selectAirport(state.selectedId, false);
     } else {
@@ -5776,7 +6587,7 @@ async function loadAircraftDetails(jet) {
       applyPlaneDetailToMatchingAircraft(currentJet, profileResult.value);
     }
     if (state.selectedKind === "aircraft" && state.selectedId === currentJet.id) {
-      selectAircraft(currentJet.id, false);
+      selectAircraft(currentJet.id, false, { preserveReducedIconState: true });
       if (routeFocusIsActiveFor(currentJet.id)) {
         requestAnimationFrame(() => fitSelectedRouteBounds(currentJet));
       }
@@ -5821,7 +6632,7 @@ async function loadAirportDetail(airport) {
   }
 }
 
-const aircraftDetailSegments = ["overview", "track", "airframe", "data"];
+const aircraftDetailSegments = ["overview", "track", "airframe", "journey"];
 const airportDetailSegments = ["dynamic", "airport", "weather", "fbo"];
 
 function syncSelectionDomState() {
@@ -5906,11 +6717,13 @@ function clearSelection(options = {}) {
   document.getElementById("leftDetailPanel").hidden = true;
   state.selectedId = null;
   state.selectedKind = null;
+  state.hoveredAirportId = null;
   state.selectedTrackStore = null;
   state.followSelectedAircraft = false;
   state.hideOtherAircraft = false;
   showAircraftMoreMenu(false);
   updateFollowButton();
+  syncAirportHoverMarkers("");
   syncSelectionDomState();
   if (hadSelection && options.render !== false) {
     renderViewport();
@@ -6064,17 +6877,32 @@ function utcOffsetLabelFromMinutes(offsetMinutes) {
   return minutes ? `UTC${sign}${hours}:${String(minutes).padStart(2, "0")}` : `UTC${sign}${hours}`;
 }
 
+function utcOffsetMinutesForZone(zone, epochMs = Date.now()) {
+  const zoneText = displayOrDash(zone);
+  if (zoneText === NA_TEXT) {
+    return null;
+  }
+  const explicitOffset = timeUtils.parseUtcOffsetMinutes ? timeUtils.parseUtcOffsetMinutes(zoneText) : null;
+  if (explicitOffset !== null && explicitOffset !== undefined) {
+    return explicitOffset;
+  }
+  if (timeUtils.isIanaTimeZone?.(zoneText) && timeUtils._private?.timeZoneOffsetMinutes) {
+    try {
+      return timeUtils._private.timeZoneOffsetMinutes(parsePanelEpoch(epochMs) || Date.now(), zoneText);
+    } catch (error) {
+      return null;
+    }
+  }
+  return null;
+}
+
 function utcOffsetLabelForZone(zone, epochMs = Date.now()) {
   const zoneText = displayOrDash(zone);
   if (zoneText === NA_TEXT) {
     return "UTC";
   }
-  const explicitOffset = timeUtils.parseUtcOffsetMinutes ? timeUtils.parseUtcOffsetMinutes(zoneText) : null;
-  if (explicitOffset !== null && explicitOffset !== undefined) {
-    return utcOffsetLabelFromMinutes(explicitOffset);
-  }
-  if (timeUtils.isIanaTimeZone?.(zoneText) && timeUtils._private?.timeZoneOffsetMinutes) {
-    const offset = timeUtils._private.timeZoneOffsetMinutes(parsePanelEpoch(epochMs) || Date.now(), zoneText);
+  const offset = utcOffsetMinutesForZone(zoneText, epochMs);
+  if (offset !== null && offset !== undefined) {
     return utcOffsetLabelFromMinutes(offset);
   }
   return /^UTC/i.test(zoneText) ? zoneText.replace(/\s+/g, "") : "UTC";
@@ -6082,6 +6910,28 @@ function utcOffsetLabelForZone(zone, epochMs = Date.now()) {
 
 function formatRouteZoneLocalTime(zone, timeRef) {
   return utcOffsetLabelForZone(zone, timeRef?.epochMs || Date.now());
+}
+
+function formatRouteTimeZoneDifference(depZone, arrZone, timeRef) {
+  const epoch = timeRef?.epochMs || Date.now();
+  const depOffset = utcOffsetMinutesForZone(depZone, epoch);
+  const arrOffset = utcOffsetMinutesForZone(arrZone, epoch);
+  if (!Number.isFinite(depOffset) || !Number.isFinite(arrOffset)) {
+    return { hidden: true, text: "" };
+  }
+  const diffMinutes = arrOffset - depOffset;
+  if (diffMinutes === 0) {
+    return { hidden: true, text: "" };
+  }
+  const sign = diffMinutes > 0 ? "+" : "-";
+  const absolute = Math.abs(diffMinutes);
+  const hours = Math.floor(absolute / 60);
+  const minutes = absolute % 60;
+  const diffText = minutes ? `${sign}${hours}h ${minutes}m` : `${sign}${hours}h`;
+  return {
+    hidden: false,
+    text: `${utcOffsetLabelFromMinutes(depOffset)} → ${utcOffsetLabelFromMinutes(arrOffset)} · ${diffText}`
+  };
 }
 
 function formatPanelTimeHighlight(ref, zone, options = {}) {
@@ -6188,57 +7038,435 @@ function renderAircraftMedia(jet) {
   setText("aircraftMediaCount", `${images.length} image${images.length > 1 ? "s" : ""}`);
 }
 
-function renderSpeedAltitudeChart(jet) {
-  const points = aircraftTrackPoints(jet)
-    .filter((point) => finiteNumber(point.timestamp) && (finiteNumber(point.altitudeFt) || finiteNumber(point.groundSpeedKt)))
-    .slice(-260);
-  setText("flightTrackPointCount", points.length ? points.length : NA_TEXT);
-  const last = points[points.length - 1];
-  setText("flightLastPointTime", last?.timestamp ? formatUtcTime(last.timestamp) : NA_TEXT);
+function speedAltitudeRouteTimes(jet, routeTimes) {
+  if (routeTimes) {
+    return routeTimes;
+  }
+  const profile = aircraftProfileForPanel(jet);
+  const dep = selectedRouteSide(jet, "dep");
+  const arr = selectedRouteSide(jet, "arr");
+  return flightTimeRefsForPanel(jet, profile.base, dep, arr);
+}
 
-  if (points.length < 2) {
-    setHtml("speedAltitudeChart", `<div class="chart-empty">${NA_TEXT}</div>`);
+function chartValueRange(values) {
+  if (!values.length) {
+    return { min: 0, max: 1 };
+  }
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  if (min === max) {
+    const pad = Math.max(1, Math.abs(max) * 0.04);
+    return { min: min - pad, max: max + pad };
+  }
+  return { min, max };
+}
+
+function chartLocalTimeZoneFromRouteTimes(routeTimes) {
+  return firstMatchedValue(
+    routeTimes?.estimatedArrival?.displayZone,
+    routeTimes?.scheduledArrival?.displayZone,
+    routeTimes?.actualDeparture?.displayZone,
+    routeTimes?.scheduledDeparture?.displayZone,
+    "UTC"
+  );
+}
+
+function chartTimeParts(value, routeTimes) {
+  const epoch = parsePanelEpoch(value);
+  if (epoch === null) {
+    return {
+      utc: NA_TEXT,
+      utcShort: NA_TEXT,
+      utcAxis: NA_TEXT,
+      local: NA_TEXT,
+      localShort: NA_TEXT,
+      localAxis: NA_TEXT,
+      localZone: "UTC",
+      combined: NA_TEXT
+    };
+  }
+  const localZone = chartLocalTimeZoneFromRouteTimes(routeTimes);
+  const localZoneLabel = utcOffsetLabelForZone(localZone, epoch);
+  const utc = formatUtcTime(epoch, { date: true });
+  const utcShort = formatPanelTime(epoch, {
+    date: false,
+    timeZone: "UTC",
+    includeZone: false
+  });
+  const local = formatPanelTime(epoch, {
+    date: true,
+    timeZone: localZone,
+    includeZone: false,
+    includeUnknownLabel: false,
+    rawUnknown: false
+  });
+  const localShort = formatPanelTime(epoch, {
+    date: false,
+    timeZone: localZone,
+    includeZone: false,
+    includeUnknownLabel: false,
+    rawUnknown: false
+  });
+  return {
+    utc,
+    utcShort,
+    utcAxis: `${utcShort}Z`,
+    local,
+    localShort,
+    localAxis: `${localShort} ${localZoneLabel}`,
+    localZone: localZoneLabel,
+    combined: `${local} ${localZoneLabel} · ${utc.replace(/\sUTC$/, "Z")}`
+  };
+}
+
+function chartAxisTimeLabel(value, routeTimes) {
+  return chartTimeParts(value, routeTimes).combined;
+}
+
+function chartAxisTimeSvg(x, y, timeParts, options = {}) {
+  const anchorClass = options.end ? " chart-axis-end" : options.middle ? " chart-axis-mid" : "";
+  const anchor = options.middle ? ' text-anchor="middle"' : "";
+  return `
+      <text x="${x}" y="${y}" class="chart-axis${anchorClass}"${anchor}>
+        <tspan class="chart-axis-local" x="${x}">${escapeHtml(timeParts.localAxis)}</tspan>
+        <tspan class="chart-axis-utc" x="${x}" dy="11">${escapeHtml(timeParts.utcAxis)}</tspan>
+      </text>`;
+}
+
+function speedAltitudeCurrentPoint(jet, timestamp) {
+  const position = currentPosition(jet);
+  if (!Array.isArray(position) || position.length !== 2) {
+    return null;
+  }
+  const lat = Number(position[0]);
+  const lng = Number(position[1]);
+  const pointTimestamp = parsePanelEpoch(timestamp) || aircraftLastUpdatedAt(jet) || Date.now();
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90) {
+    return null;
+  }
+  return {
+    lat,
+    lng: normalizeLongitude(lng),
+    altitudeFt: trackNumericValue(jet.altitude),
+    groundSpeedKt: trackNumericValue(jet.speed),
+    heading: aircraftHeading(jet),
+    timestamp: pointTimestamp,
+    source: "current",
+    quality: jet.quality || "good"
+  };
+}
+
+function mergeChartMetricPoint(existing, incoming) {
+  return {
+    ...existing,
+    ...incoming,
+    altitudeFt: trackNumericValue(incoming.altitudeFt) ?? trackNumericValue(existing.altitudeFt),
+    groundSpeedKt: trackNumericValue(incoming.groundSpeedKt) ?? trackNumericValue(existing.groundSpeedKt),
+    source: firstMatchedValue(incoming.source, existing.source),
+    quality: firstMatchedValue(incoming.quality, existing.quality)
+  };
+}
+
+function completeSpeedAltitudeChartPoints(jet, startTime, endTime) {
+  if (!Number.isFinite(startTime) || !Number.isFinite(endTime) || endTime <= startTime) {
+    return [];
+  }
+  const rawPoints = aircraftTrackPoints(jet)
+    .filter((point) => finiteNumber(point.timestamp) && (finiteNumber(point.altitudeFt) || finiteNumber(point.groundSpeedKt)))
+    .sort((first, second) => Number(first.timestamp) - Number(second.timestamp));
+  const beforeStart = [...rawPoints]
+    .reverse()
+    .find((point) => Number(point.timestamp) < startTime && (finiteNumber(point.altitudeFt) || finiteNumber(point.groundSpeedKt)));
+  const windowPoints = rawPoints.filter((point) => Number(point.timestamp) >= startTime && Number(point.timestamp) <= endTime);
+  const currentPoint = speedAltitudeCurrentPoint(jet, endTime);
+  const seedPoints = [
+    beforeStart ? { ...beforeStart, timestamp: startTime, source: firstMatchedValue(beforeStart.source, "boundary") } : null,
+    ...windowPoints,
+    currentPoint
+  ].filter(Boolean);
+  const byTimestamp = new Map();
+  seedPoints.forEach((point) => {
+    const timestamp = Number(point.timestamp);
+    if (!Number.isFinite(timestamp)) {
+      return;
+    }
+    const normalized = {
+      ...point,
+      timestamp,
+      altitudeFt: trackNumericValue(point.altitudeFt),
+      groundSpeedKt: trackNumericValue(point.groundSpeedKt)
+    };
+    const existing = byTimestamp.get(timestamp);
+    byTimestamp.set(timestamp, existing ? mergeChartMetricPoint(existing, normalized) : normalized);
+  });
+  let points = [...byTimestamp.values()].sort((first, second) => first.timestamp - second.timestamp);
+  if (points.length === 1) {
+    const only = points[0];
+    points = [
+      {
+        ...only,
+        timestamp: startTime,
+        source: firstMatchedValue(only.source, "chart-start")
+      },
+      {
+        ...only,
+        ...(currentPoint || {}),
+        timestamp: endTime,
+        source: firstMatchedValue(currentPoint?.source, only.source, "current")
+      }
+    ];
+  }
+  let lastAltitude = null;
+  let lastSpeed = null;
+  points = points.map((point) => {
+    const altitude = trackNumericValue(point.altitudeFt);
+    const speed = trackNumericValue(point.groundSpeedKt);
+    const completed = {
+      ...point,
+      altitudeFilled: altitude === null && lastAltitude !== null,
+      speedFilled: speed === null && lastSpeed !== null,
+      altitudeFt: altitude ?? lastAltitude,
+      groundSpeedKt: speed ?? lastSpeed
+    };
+    if (completed.altitudeFt !== null) {
+      lastAltitude = completed.altitudeFt;
+    }
+    if (completed.groundSpeedKt !== null) {
+      lastSpeed = completed.groundSpeedKt;
+    }
+    return completed;
+  });
+  let nextAltitude = null;
+  let nextSpeed = null;
+  for (let index = points.length - 1; index >= 0; index -= 1) {
+    const point = points[index];
+    if (point.altitudeFt === null && nextAltitude !== null) {
+      point.altitudeFt = nextAltitude;
+      point.altitudeFilled = true;
+    }
+    if (point.groundSpeedKt === null && nextSpeed !== null) {
+      point.groundSpeedKt = nextSpeed;
+      point.speedFilled = true;
+    }
+    if (point.altitudeFt !== null) {
+      nextAltitude = point.altitudeFt;
+    }
+    if (point.groundSpeedKt !== null) {
+      nextSpeed = point.groundSpeedKt;
+    }
+  }
+  return points.filter((point) => finiteNumber(point.timestamp) && (finiteNumber(point.altitudeFt) || finiteNumber(point.groundSpeedKt)));
+}
+
+function sampleSpeedAltitudeChartPoints(points, maxPoints = SPEED_ALTITUDE_CHART_MAX_POINTS) {
+  if (!Array.isArray(points) || points.length <= maxPoints) {
+    return points || [];
+  }
+  const sorted = [...points].sort((first, second) => Number(first.timestamp) - Number(second.timestamp));
+  const sampled = new Map();
+  const lastIndex = sorted.length - 1;
+  for (let index = 0; index < maxPoints; index += 1) {
+    const sourceIndex = Math.round((index / (maxPoints - 1)) * lastIndex);
+    const point = sorted[sourceIndex];
+    if (point) {
+      sampled.set(sourceIndex, point);
+    }
+  }
+  sampled.set(0, sorted[0]);
+  sampled.set(lastIndex, sorted[lastIndex]);
+  return [...sampled.entries()]
+    .sort((first, second) => first[0] - second[0])
+    .map((entry) => entry[1]);
+}
+
+function speedAltitudeChartDiagnostics(jet = selectedAircraft(), routeTimes) {
+  if (!jet) {
+    return null;
+  }
+  const resolvedRouteTimes = speedAltitudeRouteTimes(jet, routeTimes);
+  const initialPoints = aircraftTrackPoints(jet)
+    .filter((point) => finiteNumber(point.timestamp) && (finiteNumber(point.altitudeFt) || finiteNumber(point.groundSpeedKt)));
+  const departedAt = resolvedRouteTimes.actualDeparture.epochMs;
+  const startTime = departedAt || (initialPoints.length ? Math.min(...initialPoints.map((point) => Number(point.timestamp))) : null);
+  const currentTime = selectPanelNowEpoch(
+    resolvedRouteTimes,
+    jet,
+    initialPoints,
+    startTime,
+    resolvedRouteTimes.estimatedArrival.epochMs
+  ) || Date.now();
+  const endTime = startTime ? Math.max(currentTime, startTime + 60000) : currentTime;
+  const completedPoints = startTime ? completeSpeedAltitudeChartPoints(jet, startTime, endTime) : [];
+  const sampledPoints = sampleSpeedAltitudeChartPoints(completedPoints);
+  const windowMetricPoints = startTime
+    ? initialPoints.filter((point) => Number(point.timestamp) >= startTime && Number(point.timestamp) <= endTime)
+    : initialPoints;
+  return {
+    aircraftId: jet.id,
+    registration: aircraftRegistrationLabel(jet),
+    startTime,
+    endTime,
+    sourceMetricPoints: initialPoints.length,
+    sourceWindowMetricPoints: windowMetricPoints.length,
+    sourceAltitudePoints: windowMetricPoints.filter((point) => finiteNumber(point.altitudeFt)).length,
+    sourceSpeedPoints: windowMetricPoints.filter((point) => finiteNumber(point.groundSpeedKt)).length,
+    completedPoints: completedPoints.length,
+    renderedPoints: sampledPoints.length,
+    renderSampling: completedPoints.length > sampledPoints.length ? "uniform-full-span" : "none",
+    firstSourceMetricTime: initialPoints[0]?.timestamp || null,
+    firstRenderedTime: sampledPoints[0]?.timestamp || null,
+    lastRenderedTime: sampledPoints[sampledPoints.length - 1]?.timestamp || null
+  };
+}
+
+function attachSpeedAltitudeChartHover(chartElement, points, meta) {
+  if (!chartElement) {
+    return;
+  }
+  const svg = chartElement.querySelector("[data-speed-altitude-chart]");
+  const hover = svg?.querySelector("[data-chart-hover]");
+  if (!svg || !hover || !points.length) {
+    return;
+  }
+  const line = hover.querySelector("[data-chart-hover-line]");
+  const altitudePoint = hover.querySelector("[data-chart-hover-altitude]");
+  const speedPoint = hover.querySelector("[data-chart-hover-speed]");
+  const card = hover.querySelector("[data-chart-hover-card]");
+  const timeText = hover.querySelector("[data-chart-hover-time]");
+  const localTimeText = hover.querySelector("[data-chart-hover-local-time]");
+  const altitudeText = hover.querySelector("[data-chart-hover-altitude-text]");
+  const speedText = hover.querySelector("[data-chart-hover-speed-text]");
+  const plotSpan = Math.max(1, meta.endTime - meta.startTime);
+
+  function nearestPoint(targetTime) {
+    return points.reduce((nearest, point) => (
+      !nearest || Math.abs(point.timestamp - targetTime) < Math.abs(nearest.timestamp - targetTime)
+        ? point
+        : nearest
+    ), null);
+  }
+
+  function setPoint(circle, x, y) {
+    if (!circle || !Number.isFinite(y)) {
+      circle?.setAttribute("display", "none");
+      return;
+    }
+    circle.removeAttribute("display");
+    circle.setAttribute("cx", x.toFixed(1));
+    circle.setAttribute("cy", y.toFixed(1));
+  }
+
+  function updateHover(event) {
+    const bounds = svg.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) {
+      return;
+    }
+    const viewX = (Number(event.clientX) - bounds.left) / bounds.width * meta.width;
+    const clampedX = Math.max(meta.pad.left, Math.min(meta.width - meta.pad.right, viewX));
+    const targetTime = meta.startTime + ((clampedX - meta.pad.left) / meta.plotWidth) * plotSpan;
+    const point = nearestPoint(targetTime);
+    if (!point) {
+      return;
+    }
+    hover.style.display = "block";
+    line?.setAttribute("x1", point.x.toFixed(1));
+    line?.setAttribute("x2", point.x.toFixed(1));
+    setPoint(altitudePoint, point.x, point.altitudeY);
+    setPoint(speedPoint, point.x, point.speedY);
+    const timeParts = chartTimeParts(point.timestamp, meta.routeTimes);
+    if (timeText) timeText.textContent = `${timeParts.local} ${timeParts.localZone}`;
+    if (localTimeText) localTimeText.textContent = `UTC ${timeParts.utc.replace(/\sUTC$/, "Z")}`;
+    if (altitudeText) altitudeText.textContent = `ALT ${formatChartAltitude(point.altitudeFt, meta.unit)}${point.altitudeFilled ? " est." : ""}`;
+    if (speedText) speedText.textContent = `G/S ${formatChartSpeed(point.groundSpeedKt, meta.unit)}${point.speedFilled ? " est." : ""}`;
+    const cardWidth = 164;
+    const cardX = point.x > meta.width - cardWidth - 12 ? point.x - cardWidth - 10 : point.x + 10;
+    card?.setAttribute("transform", `translate(${Math.max(8, Math.min(meta.width - cardWidth - 8, cardX)).toFixed(1)} ${meta.pad.top + 8})`);
+  }
+
+  svg.addEventListener("pointermove", updateHover);
+  svg.addEventListener("pointerleave", () => {
+    hover.style.display = "none";
+  });
+}
+
+function renderSpeedAltitudeChart(jet, routeTimes) {
+  const resolvedRouteTimes = speedAltitudeRouteTimes(jet, routeTimes);
+  const chartUnit = chartUnitMode();
+  const unitLabels = chartUnitLabels(chartUnit);
+  const initialPoints = aircraftTrackPoints(jet)
+    .filter((point) => finiteNumber(point.timestamp) && (finiteNumber(point.altitudeFt) || finiteNumber(point.groundSpeedKt)));
+  const last = initialPoints[initialPoints.length - 1];
+  const departedAt = resolvedRouteTimes.actualDeparture.epochMs;
+  const startTime = departedAt || (initialPoints.length ? Math.min(...initialPoints.map((point) => Number(point.timestamp))) : null);
+  const currentTime = selectPanelNowEpoch(
+    resolvedRouteTimes,
+    jet,
+    initialPoints,
+    startTime,
+    resolvedRouteTimes.estimatedArrival.epochMs
+  ) || Date.now();
+  const endTime = startTime ? Math.max(currentTime, startTime + 60000) : currentTime;
+  const currentAltitude = finiteNumber(jet.altitude) ? Number(jet.altitude) : last?.altitudeFt;
+  const currentSpeed = finiteNumber(jet.speed) ? Number(jet.speed) : last?.groundSpeedKt;
+  setText("trackCurrentAltitude", formatChartAltitude(currentAltitude, chartUnit));
+  setText("trackCurrentSpeed", formatChartSpeed(currentSpeed, chartUnit));
+  setText("trackChartStartTime", startTime ? chartAxisTimeLabel(startTime, resolvedRouteTimes) : NA_TEXT);
+  setText("trackChartEndTime", chartAxisTimeLabel(endTime, resolvedRouteTimes));
+
+  const chartPoints = startTime ? sampleSpeedAltitudeChartPoints(completeSpeedAltitudeChartPoints(jet, startTime, endTime)) : [];
+  if (chartPoints.length < 2) {
+    setHtml("speedAltitudeChart", `<div class="chart-empty">暂无速度/高度曲线</div>`);
     return;
   }
 
   const width = 328;
-  const height = 196;
-  const pad = { left: 34, right: 18, top: 24, bottom: 30 };
+  const height = 214;
+  const pad = { left: 34, right: 18, top: 24, bottom: 44 };
   const plotWidth = width - pad.left - pad.right;
   const plotHeight = height - pad.top - pad.bottom;
-  const times = points.map((point, index) => finiteNumber(point.timestamp) ? Number(point.timestamp) : index);
-  const minTime = Math.min(...times);
-  const maxTime = Math.max(...times);
-  const altitudeValues = points.map((point) => Number(point.altitudeFt)).filter(Number.isFinite);
-  const speedValues = points.map((point) => Number(point.groundSpeedKt)).filter(Number.isFinite);
-  const minAltitude = altitudeValues.length ? Math.min(...altitudeValues) : 0;
-  const maxAltitude = altitudeValues.length ? Math.max(...altitudeValues) : 1;
-  const minSpeed = speedValues.length ? Math.min(...speedValues) : 0;
-  const maxSpeed = speedValues.length ? Math.max(...speedValues) : 1;
+  const altitudeRange = chartValueRange(chartPoints.map((point) => Number(point.altitudeFt)).filter(Number.isFinite));
+  const speedRange = chartValueRange(chartPoints.map((point) => Number(point.groundSpeedKt)).filter(Number.isFinite));
+  const timeSpan = Math.max(1, endTime - startTime);
 
-  function xFor(index) {
-    const span = Math.max(1, maxTime - minTime);
-    return pad.left + ((times[index] - minTime) / span) * plotWidth;
+  function xForTime(timestamp) {
+    return pad.left + ((Number(timestamp) - startTime) / timeSpan) * plotWidth;
   }
 
-  function yFor(value, min, max) {
-    const span = Math.max(1, max - min);
-    return pad.top + plotHeight - ((Number(value) - min) / span) * plotHeight;
+  function yFor(value, range) {
+    const span = Math.max(1, range.max - range.min);
+    return pad.top + plotHeight - ((Number(value) - range.min) / span) * plotHeight;
   }
 
-  const altitudePolyline = points
-    .map((point, index) => finiteNumber(point.altitudeFt) ? `${xFor(index).toFixed(1)},${yFor(point.altitudeFt, minAltitude, maxAltitude).toFixed(1)}` : "")
+  const interactivePoints = chartPoints.map((point) => {
+    const x = xForTime(point.timestamp);
+    const altitudeFt = Number(point.altitudeFt);
+    const groundSpeedKt = Number(point.groundSpeedKt);
+    return {
+      timestamp: Number(point.timestamp),
+      x,
+      altitudeFt,
+      groundSpeedKt,
+      altitudeFilled: Boolean(point.altitudeFilled),
+      speedFilled: Boolean(point.speedFilled),
+      altitudeY: Number.isFinite(altitudeFt) ? yFor(altitudeFt, altitudeRange) : null,
+      speedY: Number.isFinite(groundSpeedKt) ? yFor(groundSpeedKt, speedRange) : null
+    };
+  });
+  const altitudePolyline = interactivePoints
+    .map((point) => Number.isFinite(point.altitudeY) ? `${point.x.toFixed(1)},${point.altitudeY.toFixed(1)}` : "")
     .filter(Boolean)
     .join(" ");
-  const speedPolyline = points
-    .map((point, index) => finiteNumber(point.groundSpeedKt) ? `${xFor(index).toFixed(1)},${yFor(point.groundSpeedKt, minSpeed, maxSpeed).toFixed(1)}` : "")
+  const speedPolyline = interactivePoints
+    .map((point) => Number.isFinite(point.speedY) ? `${point.x.toFixed(1)},${point.speedY.toFixed(1)}` : "")
     .filter(Boolean)
     .join(" ");
-  const startLabel = formatUtcTime(minTime);
-  const endLabel = formatUtcTime(maxTime);
+  const startTimeParts = chartTimeParts(startTime, resolvedRouteTimes);
+  const midTime = startTime + timeSpan * 0.5;
+  const midTimeParts = chartTimeParts(midTime, resolvedRouteTimes);
+  const endTimeParts = chartTimeParts(endTime, resolvedRouteTimes);
 
   setHtml("speedAltitudeChart", `
-    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Speed and altitude graph">
+    <svg data-speed-altitude-chart viewBox="0 0 ${width} ${height}" role="img" aria-label="Speed and altitude graph">
       <rect x="0" y="0" width="${width}" height="${height}" rx="6" class="chart-bg"></rect>
       <g class="chart-grid">
         <path d="M${pad.left} ${pad.top + plotHeight * 0.25}H${width - pad.right}"></path>
@@ -6249,15 +7477,40 @@ function renderSpeedAltitudeChart(jet) {
       <polyline class="chart-line chart-altitude" points="${altitudePolyline}"></polyline>
       <polyline class="chart-line chart-speed" points="${speedPolyline}"></polyline>
       <g class="chart-legend">
-        <circle cx="38" cy="13" r="3" class="legend-alt"></circle><text x="46" y="17">BARO ALT</text>
-        <circle cx="142" cy="13" r="3" class="legend-speed"></circle><text x="150" y="17">GROUND SPD</text>
+        <circle cx="38" cy="13" r="3" class="legend-alt"></circle><text x="46" y="17">ALT ${escapeHtml(unitLabels.altitude)}</text>
+        <circle cx="110" cy="13" r="3" class="legend-speed"></circle><text x="118" y="17">G/S ${escapeHtml(unitLabels.speed)}</text>
       </g>
-      <text x="${pad.left}" y="${height - 10}" class="chart-axis">${escapeHtml(startLabel)}</text>
-      <text x="${width - pad.right}" y="${height - 10}" class="chart-axis chart-axis-end">${escapeHtml(endLabel)}</text>
-      <text x="${pad.left}" y="${pad.top + 12}" class="chart-axis">${escapeHtml(formatAltitude(maxAltitude))}</text>
-      <text x="${width - pad.right}" y="${pad.top + 12}" class="chart-axis chart-axis-end">${escapeHtml(formatSpeed(maxSpeed))}</text>
+      ${chartAxisTimeSvg(pad.left, height - 22, startTimeParts)}
+      ${chartAxisTimeSvg(pad.left + plotWidth * 0.5, height - 22, midTimeParts, { middle: true })}
+      ${chartAxisTimeSvg(width - pad.right, height - 22, endTimeParts, { end: true })}
+      <text x="${pad.left}" y="${pad.top + 12}" class="chart-axis">${escapeHtml(formatChartAltitude(altitudeRange.max, chartUnit))}</text>
+      <text x="${width - pad.right}" y="${pad.top + 12}" class="chart-axis chart-axis-end">${escapeHtml(formatChartSpeed(speedRange.max, chartUnit))}</text>
+      <g data-chart-hover class="chart-hover-layer" style="display:none">
+        <line data-chart-hover-line x1="${pad.left}" x2="${pad.left}" y1="${pad.top}" y2="${pad.top + plotHeight}"></line>
+        <circle data-chart-hover-altitude class="chart-hover-point chart-hover-altitude-point" r="3.4"></circle>
+        <circle data-chart-hover-speed class="chart-hover-point chart-hover-speed-point" r="3.4"></circle>
+        <g data-chart-hover-card class="chart-hover-card" transform="translate(${pad.left + 8} ${pad.top + 8})">
+          <rect width="164" height="72" rx="6"></rect>
+          <text data-chart-hover-time x="8" y="15">—</text>
+          <text data-chart-hover-local-time x="8" y="31">—</text>
+          <text data-chart-hover-altitude-text x="8" y="49">ALT —</text>
+          <text data-chart-hover-speed-text x="8" y="65">G/S —</text>
+        </g>
+      </g>
+      <rect class="chart-hit-zone" x="${pad.left}" y="${pad.top}" width="${plotWidth}" height="${plotHeight}" rx="4"></rect>
     </svg>
   `);
+  attachSpeedAltitudeChartHover(document.getElementById("speedAltitudeChart"), interactivePoints, {
+    width,
+    height,
+    pad,
+    plotWidth,
+    plotHeight,
+    startTime,
+    endTime,
+    routeTimes: resolvedRouteTimes,
+    unit: chartUnit
+  });
 }
 
 function renderRecentFlights(jet) {
@@ -6413,13 +7666,20 @@ function renderAircraftDetailPanel(jet) {
 
   const actualDepartureHighlight = formatPanelTimeHighlight(routeTimes.actualDeparture, depDisplay.zone);
   const estimatedArrivalHighlight = formatPanelTimeHighlight(routeTimes.estimatedArrival, arrDisplay.zone, { acrossDays: base.acrossDays });
+  const timeZoneDifference = formatRouteTimeZoneDifference(depDisplay.zone, arrDisplay.zone, routeTimes.serverNow);
   setText("flightTotalDuration", formatDuration(journey.totalDurationMs));
+  setText("flightTimeZoneDiff", timeZoneDifference.text || NA_TEXT);
   setText("flightDistance", formatMetersDistance(journey.distanceMeters));
   setText("flightElapsed", formatDuration(journey.elapsedMs));
   setText("flightRemaining", formatDuration(journey.remainingMs));
   const totalDurationRow = document.getElementById("flightTotalDurationRow");
   if (totalDurationRow) {
     totalDurationRow.hidden = arrDisplay.missing;
+  }
+  const timeZoneDiffRow = document.getElementById("flightTimeZoneDiffRow");
+  if (timeZoneDiffRow) {
+    timeZoneDiffRow.hidden = arrDisplay.missing || timeZoneDifference.hidden;
+    timeZoneDiffRow.title = timeZoneDifference.hidden ? "" : "到达机场相对出发机场的 UTC 时区差";
   }
   setText("departedTime", actualDepartureHighlight.time);
   setText("departedDate", actualDepartureHighlight.date);
@@ -6472,7 +7732,8 @@ function renderAircraftDetailPanel(jet) {
   setText("dataLongitude", finiteNumber(lng) ? Number(lng).toFixed(5) : NA_TEXT);
   setText("dataQuality", firstMatchedValue(jet.quality, aircraftFreshnessState(jet)));
 
-  renderSpeedAltitudeChart(jet);
+  syncSpeedAltitudeUnitButtons();
+  renderSpeedAltitudeChart(jet, routeTimes);
   renderRecentFlights(jet);
   renderAircraftMoreMenu(jet);
   syncSelectionDomState();
@@ -6683,13 +7944,23 @@ function updateFollowButton() {
   button.setAttribute("aria-pressed", state.followSelectedAircraft ? "true" : "false");
 }
 
-function selectAircraft(id, shouldPan = true) {
+function selectAircraft(id, shouldPan = true, options = {}) {
+  if (typeof shouldPan === "object" && shouldPan !== null) {
+    options = shouldPan;
+    shouldPan = options.pan !== false;
+  }
   const jet = businessJets.find((item) => item.id === id);
   if (!jet) {
     return;
   }
   const selectingDifferentAircraft = state.selectedKind !== "aircraft" || state.selectedId !== id;
-  if (state.routeFocusAircraftId && state.routeFocusAircraftId !== id) {
+  const preserveReducedIconState = options.preserveReducedIconState === true;
+  if (!preserveReducedIconState) {
+    state.routeFocusAircraftId = null;
+    state.routeFocusPreviousView = null;
+    state.map?.clearRouteEndpoints?.();
+    state.hideOtherAircraft = false;
+  } else if (state.routeFocusAircraftId && state.routeFocusAircraftId !== id) {
     state.routeFocusAircraftId = null;
     state.routeFocusPreviousView = null;
     state.map?.clearRouteEndpoints?.();
@@ -6700,6 +7971,7 @@ function selectAircraft(id, shouldPan = true) {
   state.lastTargetSelectAt = performance.now();
   state.selectedKind = "aircraft";
   state.selectedId = id;
+  state.hoveredAirportId = null;
   const nextSegment = selectingDifferentAircraft
     ? "overview"
     : state.aircraftSegmentById.get(id) || state.aircraftSegment || "overview";
@@ -6710,6 +7982,7 @@ function selectAircraft(id, shouldPan = true) {
   renderAircraftDetailPanel(jet);
   updateFollowButton();
   showAircraftMoreMenu(keepMoreMenuOpen);
+  syncAirportHoverMarkers("");
   if (shouldPan || state.followSelectedAircraft) {
     panSelectedTarget(position);
   }
@@ -6735,6 +8008,7 @@ function selectAirport(id, shouldPan = true) {
   state.lastTargetSelectAt = performance.now();
   state.selectedKind = "airport";
   state.selectedId = id;
+  state.hoveredAirportId = null;
   openAirportView(state.airportSegment);
   document.querySelectorAll("[data-airport-tab]").forEach((button) => {
     const isActive = button.dataset.airportTab === state.airportTab;
@@ -6743,6 +8017,7 @@ function selectAirport(id, shouldPan = true) {
   });
   updateRouteFocusButton();
   renderAirportDetailPanel(airport);
+  syncAirportHoverMarkers(id);
   if (shouldPan) {
     panSelectedTarget([airport.lat, airport.lng]);
   }
@@ -8123,6 +9398,26 @@ function setRouteColorMode(mode) {
   renderAircraft();
 }
 
+function syncSpeedAltitudeUnitButtons() {
+  document.querySelectorAll("[data-chart-unit]").forEach((button) => {
+    const isActive = button.dataset.chartUnit === chartUnitMode();
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
+}
+
+function setSpeedAltitudeUnit(unit) {
+  if (!["imperial", "metric"].includes(unit) || chartUnitMode() === unit) {
+    return;
+  }
+  state.speedAltitudeUnit = unit;
+  syncSpeedAltitudeUnitButtons();
+  const jet = selectedAircraft();
+  if (jet) {
+    renderSpeedAltitudeChart(jet);
+  }
+}
+
 function handleDetailSegmentKeydown(event, selector) {
   if (!["ArrowLeft", "ArrowRight"].includes(event.key)) {
     return;
@@ -8198,6 +9493,7 @@ function bindEvents() {
   const airportLayerSelect = document.getElementById("airportLayerMode");
   airportLayerSelect.value = state.airportLayerMode;
   state.airports = state.airportLayerMode !== "off";
+  document.addEventListener("pointermove", updateAirportHoverPointer, { passive: true });
   document.getElementById("filtersButton").addEventListener("click", () => showFilterSheet());
   document.getElementById("closeFilters").addEventListener("click", () => showFilterSheet(false));
   document.getElementById("labelToggle").addEventListener("change", (event) => {
@@ -8309,6 +9605,9 @@ function bindEvents() {
   document.querySelectorAll("[data-route-mode]").forEach((button) => {
     button.addEventListener("click", () => setRouteColorMode(button.dataset.routeMode));
   });
+  document.querySelectorAll("[data-chart-unit]").forEach((button) => {
+    button.addEventListener("click", () => setSpeedAltitudeUnit(button.dataset.chartUnit));
+  });
   const searchInput = searchInputElement();
   const searchPanel = searchPanelElement();
   searchInput?.addEventListener("input", (event) => {
@@ -8368,7 +9667,7 @@ function bindEvents() {
 }
 
 window.BIZJET_TRACK_STYLE_STANDARD = Object.freeze({
-  version: "1.11",
+  version: "1.15",
   styleForZoom(options = {}) {
     return { ...trackStyleForZoom(options) };
   },
@@ -8399,12 +9698,16 @@ window.BIZJET_TRACK_STYLE_STANDARD = Object.freeze({
       latestEndpointGap: selectedLatestEndpointDiagnostics()
     };
   },
+  speedAltitudeChartDiagnostics(jet) {
+    return speedAltitudeChartDiagnostics(jet);
+  },
   segmentSummary(points = [], options = {}) {
     return trackSegments(points, options.selected !== false, options.colorMode || "altitude").map((segment) => ({
       id: segment.id,
       path: segment.path,
       pathBreakBefore: segment.pathBreakBefore,
       color: segment.color,
+      semantic: segment.invalid ? "invalid" : segment.estimated ? "estimated" : "actual",
       estimated: segment.estimated,
       estimatedReason: segment.estimatedReason,
       invalid: segment.invalid,
@@ -8529,7 +9832,7 @@ async function init() {
     });
     if (state.selectedKind === "aircraft" && state.selectedId) {
       const selected = state.selectedId;
-      selectAircraft(selected, false);
+      selectAircraft(selected, false, { preserveReducedIconState: true });
     } else {
       renderAircraft();
       updateRail();

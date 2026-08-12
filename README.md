@@ -1,8 +1,8 @@
-# Global BizJet Ops 1.14
+# Global BizJet Ops 1.15
 
-V1.14 prototype for a web-based aircraft operations map, icon test system, ICAO-code icon control console, private operations database integration, normalized selected-aircraft route visualization, selected-track live continuity, Graphite selected aircraft/airport detail panels, FR24-style search interaction, all-zoom aircraft icon visibility testing, and ICAO-code-driven aircraft icon rendering.
+V1.15 prototype for a web-based aircraft operations map, icon test system, ICAO-code icon control console, private operations database integration, normalized selected-aircraft route visualization, selected-track live continuity, Graphite selected aircraft/airport detail panels, FR24-style search interaction, all-zoom aircraft icon visibility testing, ICAO-code-driven aircraft icon rendering, and selected-track analysis optimization.
 
-Version 1.14 is the current published iteration. The latest frozen snapshot is `versions/1.14/`.
+Version 1.15 is the current active root iteration. The latest frozen snapshot is `versions/1.14/`.
 
 Version history is summarized in `CHANGELOG.md`. GitHub packaging and credential-handling notes are documented in `docs/github-packaging-notes.md`.
 
@@ -29,6 +29,8 @@ Version 1.12 is frozen under `versions/1.12/`.
 Version 1.14 is frozen under `versions/1.14/`.
 
 Version 1.14 starts the Graphite selected-detail interaction iteration and finalizes the selected-aircraft journey card rules for plaintext map labels, unknown-destination `N/A` display, total-duration calculation, UTC hiding, and right-edge progress placement.
+
+Version 1.15 implements selected-track analysis optimization: map hit layers for route hover diagnostics, selected-route quality grading, planned-route diagnostics, ALT/SPD analysis synchronization, a dedicated track-inspection panel inside the selected aircraft detail view, completed speed-altitude chart data with compact local-first UTC timing and metric/imperial unit switching, and a standalone aircraft Journey tab placed immediately after Information.
 
 Version 1.2 adds a local control console in `admin.html` for icon library review, aircraft type-code mapping, validation, draft publishing, rollback snapshots, import/export, and audit logs.
 
@@ -105,6 +107,8 @@ Airport selected-panel requirements for version 1.9 are documented in `docs/airp
 
 Search bar interaction requirements for version 1.9 are documented in `docs/search-bar-interaction-requirements-v1.9.md`.
 
+Selected aircraft track optimization requirements for version 1.15 are documented in `docs/track-feature-optimization-v1.15.md`.
+
 ## Scope
 
 - Supports the official Google Maps JavaScript API renderer through `config.js`.
@@ -131,6 +135,7 @@ Search bar interaction requirements for version 1.9 are documented in `docs/sear
 - Version 1.11 uses `513011.planeInfo.icaoCode` as the authoritative Aircraft Type Code for icon mapping and keeps GL7T, GL8T, and GA7C on their dedicated ultra-long icons after selection changes or realtime refreshes.
 - Version 1.12 makes `icaoCode` the primary public mapping field, keeps `aircraftTypeCode` as a compatibility alias, lets `admin.html` publish a local `icaoCodeIconMap`, and tightens aircraft marker hit areas to the rendered icon size.
 - Version 1.14 replaces the old detail-panel tabs with real aircraft and airport segments, makes airport summary counts functional filters, and clears selection consistently from the close button, Escape key, or blank-map click.
+- Version 1.15 adds selected-route hover diagnostics, route quality grading, planned-route inspection, synchronized ALT/SPD track analysis, completed speed-altitude chart points with compact local-first UTC timing, metric/imperial chart units, and a standalone aircraft Journey tab immediately to the right of Information while preserving selected aircraft/airport panel behavior from 1.14.
 - Includes global aircraft markers, aircraft-type marker variants, API-driven position refresh, Google/Leaflet polyline tracks, left-side aircraft detail panel, airport coordinate points, airport detail panel, search, filters, weather overlay, and an operations panel.
 - Transparent aircraft icon PNG assets for business jets, widebody jets, narrowbody jets, regional jets, turboprops, light aircraft, helicopters, balloons, drones, military aircraft, ground vehicles, and spacecraft are stored under `assets/aircraft-icons/fr24-template-shadow-fr24yellow/`.
 - No third-party live traffic data is requested; the home map reads from the configured private API account.

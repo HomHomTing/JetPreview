@@ -721,32 +721,95 @@
     };
   }
 
+  function trackArrayLatLng(item) {
+    const first = toNumber(item?.[0]);
+    const second = toNumber(item?.[1]);
+    if (!Number.isFinite(first) || !Number.isFinite(second)) {
+      return null;
+    }
+    const firstLooksLat = Math.abs(first) <= 90 && Math.abs(second) <= 180;
+    const secondLooksLat = Math.abs(second) <= 90 && Math.abs(first) <= 180;
+    if (firstLooksLat || !secondLooksLat) {
+      return { lat: first, lng: second };
+    }
+    return { lat: second, lng: first };
+  }
+
+  function valueLooksLikeEpoch(value) {
+    if (typeof value === "string" && /[-T:\s]/.test(value.trim())) {
+      return normalizeEpochMs(value) !== null;
+    }
+    const numeric = toNumber(value);
+    return Number.isFinite(numeric) && Math.abs(numeric) > 100000000;
+  }
+
+  function adaptArrayTrackPoint(item) {
+    const coordinate = trackArrayLatLng(item);
+    if (!coordinate) {
+      return null;
+    }
+    const third = item[2];
+    const fourth = item[3];
+    const fifth = item[4];
+    const sixth = item[5];
+    const thirdIsTime = valueLooksLikeEpoch(third);
+    const fourthIsTime = valueLooksLikeEpoch(fourth);
+    const fifthIsTime = valueLooksLikeEpoch(fifth);
+    const headingValue = thirdIsTime || item.length >= 5 ? sixth : fourthIsTime ? third : null;
+    const altitudeValue = thirdIsTime
+      ? fourth
+      : fourthIsTime
+        ? null
+        : third;
+    const speedValue = thirdIsTime
+      ? fifth
+      : fourthIsTime
+        ? null
+        : fourth;
+    const timestampValue = thirdIsTime ? third : fourthIsTime ? fourth : fifthIsTime ? fifth : null;
+    return {
+      lat: coordinate.lat,
+      lng: coordinate.lng,
+      altitudeFt: normalizeAltitude(altitudeValue),
+      groundSpeedKt: normalizeSpeed(speedValue),
+      heading: normalizeCourse(headingValue),
+      timestamp: normalizeEpochMs(timestampValue),
+      source: "array-coordinate",
+      quality: "good",
+      isEstimated: false,
+      estimatedReason: ""
+    };
+  }
+
   function adaptTrackPoint(item) {
+    if (Array.isArray(item)) {
+      return adaptArrayTrackPoint(item);
+    }
     const lat = toNumber(item.lat ?? item.latitude);
     const lng = toNumber(item.lng ?? item.lon ?? item.longitude);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
       return null;
     }
-    const altitudeFt = toNumber(item.altitudeFt);
-    const altitudeM = toNumber(item.altitudeM);
-    const speedKt = toNumber(item.groundSpeedKt ?? item.speedKt);
-    const speedKmh = toNumber(item.speedKmh);
+    const altitudeFt = toNumber(item.altitudeFt ?? item.altFt ?? item.baroAltitudeFt ?? item.gpsAltitudeFt);
+    const altitudeM = toNumber(item.altitudeM ?? item.altM ?? item.heightM ?? item.baroAltitudeM ?? item.gpsAltitudeM);
+    const speedKt = toNumber(item.groundSpeedKt ?? item.speedKt ?? item.groundSpeed ?? item.gs ?? item.velocityKt);
+    const speedKmh = toNumber(item.speedKmh ?? item.velocityKmh);
     const isEstimated = Boolean(item.isEstimated || item.estimated || item.quality === "estimated");
     return {
       lat,
       lng,
       altitudeFt: Number.isFinite(altitudeFt)
         ? altitudeFt
-        : Number.isFinite(altitudeM)
-          ? metersToFeet(altitudeM)
-          : normalizeAltitude(item.altitude),
+          : Number.isFinite(altitudeM)
+            ? metersToFeet(altitudeM)
+          : normalizeAltitude(item.altitude ?? item.alt ?? item.height ?? item.baroAltitude ?? item.gpsAltitude),
       groundSpeedKt: Number.isFinite(speedKt)
         ? speedKt
         : Number.isFinite(speedKmh)
           ? kmhToKnots(speedKmh)
-          : normalizeSpeed(item.speed),
-      heading: normalizeCourse(item.heading ?? item.course),
-      timestamp: normalizeEpochMs(item.timestamp || item.createTime || item.time),
+          : normalizeSpeed(item.speed ?? item.velocity),
+      heading: normalizeCourse(item.heading ?? item.course ?? item.track ?? item.bearing),
+      timestamp: normalizeEpochMs(item.timestamp || item.createTime || item.time || item.sampleTime || item.positionTime),
       source: firstValue(item.source, item.userMark, ""),
       quality: firstValue(item.quality, isEstimated ? "estimated" : "good"),
       isEstimated,
@@ -759,11 +822,6 @@
       return [];
     }
     return source.map((item) => {
-      if (Array.isArray(item)) {
-        const lat = toNumber(item[0]);
-        const lng = toNumber(item[1]);
-        return Number.isFinite(lat) && Number.isFinite(lng) ? [lat, lng] : null;
-      }
       return adaptTrackPoint(item);
     }).filter(Boolean);
   }

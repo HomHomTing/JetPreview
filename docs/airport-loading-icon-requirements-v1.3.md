@@ -84,12 +84,21 @@ FR24 官方没有公开精确 zoom 阈值。以下阈值为页面观察 + 官方
 | `<3.5` | 默认隐藏普通机场；只保留 selected、favorite、搜索结果 | 无标签 | 50 | 不主动加载机场，仅保留状态对象 |
 | `3.5-5.49` | 仅 `displayLevel <= 1` | pin only | 120 | idle 后请求 bbox，低频刷新 |
 | `5.5-6.49` | `displayLevel <= 2` | pin only | 350 | idle 后请求 bbox，优先缓存 |
-| `6.5-7.49` | `displayLevel <= 3` | pin only | 650 | idle 后请求 bbox，差量更新 |
-| `7.5-8.49` | `displayLevel <= 4` | pin only | 900 | idle 后请求 bbox，局部重绘 |
-| `8.5-9.49` | `displayLevel <= 4`，高优先级 `5` 可少量显示 | pin only；selected/hover 可显示 tooltip | 1200 | 进入城市群视图，启用碰撞剔除 |
-| `9.5-10.49` | `displayLevel <= 5`，仍需密度限制 | 主要机场显示 IATA/ICAO 代码 | 1600 | 标签单独碰撞计算 |
+| `6.5-6.99` | `displayLevel <= 3` | pin only | 650 | idle 后请求 bbox，差量更新 |
+| `7.0-8.49` | 显示当前视口内所有可用机场，包含 `displayLevel 5` 小机场 | pin only | 不做前端截断，请求上限默认 50000 | 约 50km 比例尺起进入全机场 pin 模式 |
+| `8.5-9.49` | 显示当前视口内所有可用机场 | pin only；selected/hover 可显示 tooltip | 不做前端截断，请求上限默认 50000 | 进入城市群视图，pin 必须保留，标签启用碰撞剔除 |
+| `9.5-10.49` | 显示当前视口内所有可用机场 | 主要机场显示 IATA/ICAO 代码 | 不做前端截断，请求上限默认 50000 | 标签单独碰撞计算 |
 | `10.5-11.49` | 显示所有视口内可用机场 | 主要机场显示代码；hover/selected 显示完整名称 | 2200 | 细节层加载，详情仍懒加载 |
 | `>=11.5` | 显示所有视口内机场和专业机场 | 高等级机场可显示完整名称 + IATA + ICAO；低等级显示代码或 pin | 3000 | 可加载机场边界/跑道概览 |
+
+### 4.1.1 50km 比例尺补充规则
+
+FR24 在远距离缩放下会控制机场密度，避免全球视图被机场点覆盖；但进入约 50km 比例尺时，用户已经处于区域/城市群观察场景，应能看到当前视口内全部机场 pin。本项目将 Google zoom `7.0` 作为 50km 触发阈值：
+
+- `zoom < 7.0`：继续按 `displayLevel` 和数量上限做密度控制。
+- `zoom >= 7.0`：`displayLevelMax = 5`，当前视口内所有机场均可进入渲染队列。
+- `zoom >= 7.0`：机场 pin 不再被 Google Advanced Marker 的碰撞优先级隐藏；仅机场标签继续做碰撞剔除。
+- `zoom >= 7.0`：小型机场图标必须有可见尺寸，不能用 `0 x 0` 尺寸实现隐藏。
 
 ### 4.2 连续缩放与滞后
 
@@ -323,13 +332,20 @@ FR24 官方没有公开精确 zoom 阈值。以下阈值为页面观察 + 官方
   "east": 1.4,
   "zoom": 8.3,
   "airportLayerMode": "auto",
-  "maxAirports": 900,
-  "displayLevelMax": 4,
+  "maxAirports": 50000,
+  "displayLevelMax": 5,
   "includeLabels": true,
   "selectedAirportCode": "LHR",
   "businessJetOnly": false
 }
 ```
+
+当 `zoom >= 7.0`，机场视口请求必须使用：
+
+- `displayLevelMax: 5`
+- `maxAirports: 50000` 或服务端允许的等价高上限
+- `airportScope: "viewport"`
+- 若飞机请求为了全缩放飞机图标使用全球范围，仍需额外传入 `airportNorth`、`airportSouth`、`airportWest`、`airportEast` 表示机场独立视口范围。
 
 返回：
 

@@ -1,8 +1,8 @@
 # GitHub Packaging Notes
 
-Current online/GitHub release packaging target: **1.12**.
+Current online/GitHub release packaging target: **1.15**.
 
-The project root is now aligned with the 1.12 online release. Frozen historical snapshots are kept in `versions/1.0/`, `versions/1.1/`, `versions/1.2/`, `versions/1.5/`, `versions/1.6/`, `versions/1.8/`, `versions/1.9/`, `versions/1.10/`, `versions/1.11/`, and `versions/1.12/`.
+The project root is now aligned with the 1.15 online release. Frozen historical snapshots are kept in `versions/1.0/`, `versions/1.1/`, `versions/1.2/`, `versions/1.5/`, `versions/1.6/`, `versions/1.8/`, `versions/1.9/`, `versions/1.10/`, `versions/1.11/`, `versions/1.12/`, and `versions/1.14/`.
 
 ## Repository Content
 

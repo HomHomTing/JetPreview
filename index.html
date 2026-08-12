@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Business jet map interface prototype.">
-    <title>Business Jet Radar 1.14</title>
+    <title>Business Jet Radar 1.15</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%23ffd21c' stroke='%23161616' stroke-width='1.5' d='M16 2c1.7 0 2.8 7.7 3.2 10.6l10 4.2c.6.2.9.8.9 1.4v1.9l-10.7-2.4-.6 5.1 4.2 2.6v2l-5.8-1.3L16 31l-1.3-4.9-5.8 1.3v-2l4.2-2.6-.6-5.1-10.7 2.4v-1.9c0-.6.3-1.2.9-1.4l10-4.2C13.2 9.7 14.3 2 16 2Z'/%3E%3C/svg%3E">
     <link
       rel="stylesheet"
@@ -12,7 +12,7 @@
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
       crossorigin=""
     >
-    <link rel="stylesheet" href="./styles.css?v=1.14-detail-interaction">
+    <link rel="stylesheet" href="./styles.css?v=1.15-track-analysis-airport-hover-stability">
   </head>
   <body>
     <svg aria-hidden="true" class="icon-sprite">
@@ -160,8 +160,8 @@
           <nav class="detail-segments" aria-label="Aircraft detail sections" role="tablist">
             <button type="button" class="active" data-aircraft-segment="overview" role="tab" aria-selected="true">概览</button>
             <button type="button" data-aircraft-segment="track" role="tab" aria-selected="false">航迹</button>
-            <button type="button" data-aircraft-segment="airframe" role="tab" aria-selected="false">机务</button>
-            <button type="button" data-aircraft-segment="data" role="tab" aria-selected="false">数据</button>
+            <button type="button" data-aircraft-segment="airframe" role="tab" aria-selected="false">信息</button>
+            <button type="button" data-aircraft-segment="journey" role="tab" aria-selected="false">行程</button>
           </nav>
 
           <div class="detail-scroll-body">
@@ -222,6 +222,7 @@
                 </section>
                 <dl class="journey-distance-metric">
                   <div id="flightTotalDurationRow"><dt>预计总时长</dt><dd id="flightTotalDuration">—</dd></div>
+                  <div id="flightTimeZoneDiffRow" class="journey-timezone-diff" hidden><dt>时区差</dt><dd id="flightTimeZoneDiff">—</dd></div>
                   <div><dt>已飞行距离</dt><dd id="flightDistance">—</dd></div>
                 </dl>
               </section>
@@ -247,23 +248,25 @@
 
             <section class="detail-segment-panel" data-aircraft-panel="track" hidden>
               <section class="detail-section">
-                <h2>速度与高度</h2>
+                <div class="chart-section-head">
+                  <h2>速度与高度</h2>
+                  <div class="chart-unit-toggle" role="group" aria-label="Speed and altitude unit">
+                    <button type="button" class="active" data-chart-unit="imperial" aria-pressed="true">FT / KT</button>
+                    <button type="button" data-chart-unit="metric" aria-pressed="false">M / KMH</button>
+                  </div>
+                </div>
                 <div id="speedAltitudeChart" class="speed-altitude-chart" aria-label="Speed and altitude graph"></div>
                 <dl class="detail-grid chart-readouts">
-                  <div><dt>最大高度</dt><dd id="flightMaxAltitude">—</dd></div>
-                  <div><dt>最大速度</dt><dd id="flightMaxSpeed">—</dd></div>
-                  <div><dt>最后点时间</dt><dd id="flightLastPointTime">—</dd></div>
-                  <div><dt>航迹点数</dt><dd id="flightTrackPointCount">—</dd></div>
+                  <div><dt>实时高度</dt><dd id="trackCurrentAltitude">—</dd></div>
+                  <div><dt>实时地速</dt><dd id="trackCurrentSpeed">—</dd></div>
+                  <div><dt>起飞时刻</dt><dd id="trackChartStartTime">—</dd></div>
+                  <div><dt>当前时刻</dt><dd id="trackChartEndTime">—</dd></div>
                 </dl>
-              </section>
-              <section class="detail-section">
-                <h2>近期航班</h2>
-                <div id="recentFlightsList" class="related-list"></div>
               </section>
             </section>
 
-            <section class="detail-segment-panel" data-aircraft-panel="airframe" hidden>
-              <section class="detail-section">
+            <section class="detail-segment-panel aircraft-info-panel" data-aircraft-panel="airframe" hidden>
+              <section class="detail-section aircraft-info-section">
                 <h2>飞机信息</h2>
                 <dl class="detail-list">
                   <div><dt>机型</dt><dd id="aircraftModel">—</dd></div>
@@ -281,19 +284,10 @@
               </section>
             </section>
 
-            <section class="detail-segment-panel" data-aircraft-panel="data" hidden>
-              <section class="detail-section">
-                <h2>数据可信度</h2>
-                <dl class="detail-list">
-                  <div><dt>来源类型</dt><dd id="dataSourceType">—</dd></div>
-                  <div><dt>ICAO 24 位地址</dt><dd id="dataIcao24">—</dd></div>
-                  <div><dt>最后位置时间</dt><dd id="dataLastPositionTime">—</dd></div>
-                  <div><dt>坐标</dt><dd id="flightCoordinates">—</dd></div>
-                  <div><dt>纬度</dt><dd id="dataLatitude">—</dd></div>
-                  <div><dt>经度</dt><dd id="dataLongitude">—</dd></div>
-                  <div><dt>数据质量</dt><dd id="dataQuality">—</dd></div>
-                  <div><dt>数据来源</dt><dd id="aircraftSource">—</dd></div>
-                </dl>
+            <section class="detail-segment-panel aircraft-journey-panel" data-aircraft-panel="journey" hidden>
+              <section class="detail-section aircraft-journey-section">
+                <h2>行程</h2>
+                <div id="recentFlightsList" class="related-list"></div>
               </section>
             </section>
           </div>
@@ -474,12 +468,12 @@
       integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
       crossorigin=""
     ></script>
-    <script src="./config.js?v=1.14-detail-interaction"></script>
-    <script src="./aircraft-icon-config.js?v=1.14-detail-interaction"></script>
-    <script src="./aircraft-icon-runtime-config.js?v=1.14-detail-interaction"></script>
-    <script src="./time-utils.js?v=1.14-detail-interaction"></script>
-    <script src="./data-service.js?v=1.14-detail-interaction"></script>
+    <script src="./config.js?v=1.15-track-analysis-airport-hover-stability"></script>
+    <script src="./aircraft-icon-config.js?v=1.15-track-analysis-airport-hover-stability"></script>
+    <script src="./aircraft-icon-runtime-config.js?v=1.15-track-analysis-airport-hover-stability"></script>
+    <script src="./time-utils.js?v=1.15-track-analysis-airport-hover-stability"></script>
+    <script src="./data-service.js?v=1.15-track-analysis-airport-hover-stability"></script>
     <script src="./ground-projection-core.js?v=1.11"></script>
-    <script src="./app.js?v=1.14-detail-interaction"></script>
+    <script src="./app.js?v=1.15-track-analysis-airport-hover-stability"></script>
   </body>
 </html>
