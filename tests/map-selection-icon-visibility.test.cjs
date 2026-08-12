@@ -63,5 +63,25 @@ assert.match(
   /function\s+googleAirportCollisionBehavior\(airport,\s*options\s*=\s*{}\)\s*{[\s\S]*?return\s+collisionBehavior\.REQUIRED;/,
   "airport markers are required and cannot disappear due to map collision after selection"
 );
+assert.match(
+  appSource,
+  /function\s+configuredText\(value\)\s*{[\s\S]*?YOUR_[\s\S]*?return\s+"";[\s\S]*?}/,
+  "placeholder runtime config values are treated as missing"
+);
+assert.match(
+  appSource,
+  /const\s+googleMarkerMapId\s*=\s*configuredText\(appConfig\.googleMapId\)\s*\|\|\s*"DEMO_MAP_ID";/,
+  "Google map id ignores template placeholders before falling back to the demo id"
+);
+assert.match(
+  appSource,
+  /const\s+apiKey\s*=\s*googleMapsApiKey\(\);[\s\S]*?if\s*\(!apiKey\)\s*{[\s\S]*?Missing Google Maps API key/,
+  "Google Maps loader validates the configured API key before injecting the script"
+);
+assert.match(
+  appSource,
+  /defaultMapProvider[\s\S]*?===\s*"google"[\s\S]*?&&\s*googleMapsApiKey\(\)/,
+  "Google map engine is selected only when a real API key is configured"
+);
 
 console.log("map selection icon visibility: ok");

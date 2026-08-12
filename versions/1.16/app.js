@@ -1,4 +1,17 @@
 const appConfig = window.APP_CONFIG || {};
+
+function configuredText(value) {
+  const text = String(value ?? "").trim();
+  if (!text || /^(YOUR_|REPLACE_|TODO(?:_|$)|<.+>$)/i.test(text)) {
+    return "";
+  }
+  return text;
+}
+
+function googleMapsApiKey() {
+  return configuredText(appConfig.googleMapsApiKey);
+}
+
 const aircraftIconConfig = window.AIRCRAFT_ICON_CONFIG || {};
 const timeUtils = window.BIZJET_TIME || {};
 const AIRCRAFT_ICON_RUNTIME_STORAGE_KEY = "aircraft-icon-runtime-config:v1.12";
@@ -49,7 +62,7 @@ const aircraftByRegistration = new Map();
 const defaultCenter = [22, 18];
 const initialMapUseUserLocation = appConfig.initialMapUseUserLocation !== false;
 const initialMapLocationTimeoutMs = appConfig.initialMapLocationTimeoutMs ?? 6000;
-const googleMarkerMapId = appConfig.googleMapId || "DEMO_MAP_ID";
+const googleMarkerMapId = configuredText(appConfig.googleMapId) || "DEMO_MAP_ID";
 const googleMapsLoadTimeoutMs = appConfig.googleMapsLoadTimeoutMs || 12000;
 const mapZoomRange = {
   min: appConfig.mapZoomRange?.min ?? 2,
@@ -3234,7 +3247,8 @@ function loadGoogleMaps() {
       resolve();
       return;
     }
-    if (!appConfig.googleMapsApiKey) {
+    const apiKey = googleMapsApiKey();
+    if (!apiKey) {
       reject(new Error("Missing Google Maps API key"));
       return;
     }
@@ -3260,7 +3274,7 @@ function loadGoogleMaps() {
     window.__initBizJetGoogleMap = () => finish(resolve);
     const script = document.createElement("script");
     const params = new URLSearchParams({
-      key: appConfig.googleMapsApiKey,
+      key: apiKey,
       callback: "__initBizJetGoogleMap",
       v: "weekly",
       loading: "async",
@@ -3282,7 +3296,7 @@ function loadGoogleMaps() {
 }
 
 async function createMapEngine() {
-  if ((appConfig.defaultMapProvider || "google") === "google" && appConfig.googleMapsApiKey) {
+  if ((appConfig.defaultMapProvider || "google") === "google" && googleMapsApiKey()) {
     await loadGoogleMaps();
     return new GoogleMapEngine();
   }
