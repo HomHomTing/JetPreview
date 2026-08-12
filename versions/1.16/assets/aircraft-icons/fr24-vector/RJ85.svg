@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="4096" viewBox="0 0 64 64" fill="none" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
+  <title>RJ85</title>
+  <path d="M32 7.2c2.6 0 4.3 12.5 5 17.4l20 4.3c1.2.3 2 1.3 2 2.5v3.1l-21.2-2.1-.9 9.2 7 4.4v3.3l-9.7-2.1L32 57.5l-2.2-10.3-9.7 2.1V46l7-4.4-.9-9.2L5 34.5v-3.1c0-1.2.8-2.2 2-2.5l20-4.3c.7-4.9 2.4-17.4 5-17.4ZM14.7 29.6h3.9v3.1h-3.9Zm7.5-.8h3.9v3.1h-3.9Zm15.7 0h3.9v3.1h-3.9Zm7.5.8h3.9v3.1h-3.9Z" fill="#f8c400" stroke="#131920" stroke-width="2.45" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill"/>
+  <path d="M32 7.2c2.6 0 4.3 12.5 5 17.4l20 4.3c1.2.3 2 1.3 2 2.5v3.1l-21.2-2.1-.9 9.2 7 4.4v3.3l-9.7-2.1L32 57.5l-2.2-10.3-9.7 2.1V46l7-4.4-.9-9.2L5 34.5v-3.1c0-1.2.8-2.2 2-2.5l20-4.3c.7-4.9 2.4-17.4 5-17.4ZM14.7 29.6h3.9v3.1h-3.9Zm7.5-.8h3.9v3.1h-3.9Zm15.7 0h3.9v3.1h-3.9Zm7.5.8h3.9v3.1h-3.9Z" fill="none" stroke="#ffe16a" stroke-opacity="0.22" stroke-width="0.32" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>
