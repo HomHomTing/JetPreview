@@ -12,6 +12,24 @@ function googleMapsApiKey() {
   return configuredText(appConfig.googleMapsApiKey);
 }
 
+let googleMapsAuthFailureReason = "";
+const googleMapsRenderedErrorPatterns = [
+  /This page (?:didn'?t|can't|cannot) load Google Maps correctly/i,
+  /糟糕[！!]?.*出了点问题/,
+  /此页面未能正确加载\s*Google\s*地图/
+];
+
+function googleMapRenderedErrorVisible(container = document.getElementById("map")) {
+  if (!container) {
+    return false;
+  }
+  if (container.querySelector(".gm-err-container, .gm-err-content, .gm-err-title")) {
+    return true;
+  }
+  const text = container.textContent || "";
+  return googleMapsRenderedErrorPatterns.some((pattern) => pattern.test(text));
+}
+
 const aircraftIconConfig = window.AIRCRAFT_ICON_CONFIG || {};
 const timeUtils = window.BIZJET_TIME || {};
 const AIRCRAFT_ICON_RUNTIME_STORAGE_KEY = "aircraft-icon-runtime-config:v1.12";
@@ -2062,6 +2080,8 @@ const state = {
   followSelectedAircraft: false,
   hideOtherAircraft: false,
   mapProvider: "loading",
+  mapFallbackInProgress: false,
+  mapFallbackReason: "",
   map: null,
   tracks: new Map(),
   weatherLayer: null,
@@ -2579,6 +2599,9 @@ class GoogleMapEngine {
     this.isClampingCenter = false;
     this.pendingWheelZoom = null;
     this.wheelFrame = null;
+    this.authErrorObserver = null;
+    this.authErrorWatchTimer = null;
+    this.authErrorWatchAttempts = 0;
     const options = {
       center: { lat: defaultMapCenter()[0], lng: defaultMapCenter()[1] },
       zoom: defaultZoom(),
@@ -2606,6 +2629,7 @@ class GoogleMapEngine {
     this.contrastOverlay = createGoogleMapContrastOverlay(this.map);
     this.map.addListener("center_changed", () => this.clampVerticalCenter());
     this.bindSmoothWheelZoom();
+    this.watchRenderedAuthErrors();
   }
 
   ready() {
@@ -2618,6 +2642,54 @@ class GoogleMapEngine {
         throw new Error("Google Maps AdvancedMarkerElement is unavailable");
       }
     });
+  }
+
+  destroy() {
+    this.authErrorObserver?.disconnect();
+    this.authErrorObserver = null;
+    if (this.authErrorWatchTimer) {
+      window.clearInterval(this.authErrorWatchTimer);
+      this.authErrorWatchTimer = null;
+    }
+    this.removeInactiveTracks(new Set());
+    this.aircraftMarkers.forEach((record) => {
+      record.marker.map = null;
+    });
+    this.aircraftMarkers.clear();
+    this.airportMarkers.forEach((record) => {
+      record.marker.map = null;
+    });
+    this.airportMarkers.clear();
+    this.clearRouteEndpoints();
+    this.setWeather(false);
+    this.contrastOverlay?.setMap(null);
+    this.overlay?.setMap(null);
+    google.maps.event.clearInstanceListeners(this.map);
+  }
+
+  watchRenderedAuthErrors() {
+    const mapDiv = this.map.getDiv();
+    const detect = () => {
+      if (googleMapRenderedErrorVisible(mapDiv)) {
+        googleMapsAuthFailureReason = "Google Maps rendered an authorization error";
+        scheduleGoogleMapsFallback("Google Maps rendered an authorization error");
+        return true;
+      }
+      return false;
+    };
+    this.authErrorObserver = new MutationObserver(() => detect());
+    this.authErrorObserver.observe(mapDiv, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+    this.authErrorWatchTimer = window.setInterval(() => {
+      this.authErrorWatchAttempts += 1;
+      if (detect() || this.authErrorWatchAttempts > 30) {
+        window.clearInterval(this.authErrorWatchTimer);
+        this.authErrorWatchTimer = null;
+      }
+    }, 500);
   }
 
   project(latLng) {
@@ -3266,10 +3338,14 @@ function loadGoogleMaps() {
       callback(value);
     }
     window.gm_authFailure = () => {
+      googleMapsAuthFailureReason = "Google Maps API authorization failed";
       if (typeof previousAuthFailure === "function") {
         previousAuthFailure();
       }
       finish(reject, new Error("Google Maps API authorization failed"));
+      if (state.map?.type === "google" || state.mapProvider === "google") {
+        scheduleGoogleMapsFallback("Google Maps API authorization failed");
+      }
     };
     window.__initBizJetGoogleMap = () => finish(resolve);
     const script = document.createElement("script");
@@ -9695,6 +9771,81 @@ function updateMapModeClass() {
   shell.classList.toggle("leaflet-map-mode", state.mapProvider === "leaflet");
 }
 
+function clearNativeMapContainer() {
+  const mapElement = document.getElementById("map");
+  if (mapElement) {
+    mapElement.replaceChildren();
+    mapElement.removeAttribute("style");
+    mapElement.className = "map";
+  }
+  document.getElementById("aircraftLayer").innerHTML = "";
+  document.getElementById("airportLayer").innerHTML = "";
+  state.tracks.clear();
+  state.weatherLayer = null;
+}
+
+async function fallbackToLeafletMap(reason = "Google Maps unavailable") {
+  if (state.mapFallbackInProgress || state.mapProvider === "leaflet" || state.map?.type === "leaflet") {
+    return;
+  }
+  state.mapFallbackInProgress = true;
+  state.mapFallbackReason = reason;
+  const previousView = state.map?.getView?.() || {
+    center: state.initialMapCenter,
+    zoom: defaultZoom()
+  };
+  try {
+    state.map?.destroy?.();
+    clearNativeMapContainer();
+    state.map = new LeafletMapEngine();
+    await state.map.ready();
+    state.mapProvider = state.map.type;
+    updateMapModeClass();
+    state.map.setView(previousView.center || state.initialMapCenter, previousView.zoom || defaultZoom());
+    bindMapViewportEvents();
+    renderViewport();
+    refreshAirportData("map-fallback");
+    refreshRealtimeData("map-fallback");
+  } finally {
+    state.mapFallbackInProgress = false;
+  }
+}
+
+function scheduleGoogleMapsFallback(reason) {
+  window.setTimeout(() => {
+    fallbackToLeafletMap(reason);
+  }, 0);
+}
+
+function bindMapViewportEvents() {
+  const refreshViewportData = debounce(() => {
+    state.isInteractingWithMap = false;
+    renderViewport();
+    refreshRealtimeData("viewport");
+  }, mapLoadingConfig.viewportDebounceMs);
+  state.map.onViewportChange({
+    onInteractionStart: () => {
+      state.isInteractingWithMap = true;
+      if (state.followSelectedAircraft) {
+        state.followSelectedAircraft = false;
+        updateFollowButton();
+      }
+    },
+    onVisualChange: () => {
+      renderViewport();
+    },
+    onIdle: refreshViewportData
+  });
+  state.map.onMapClick?.(() => {
+    if (performance.now() - state.lastTargetSelectAt < 180) {
+      return;
+    }
+    if (state.selectedKind || state.selectedId) {
+      clearSelection();
+    }
+  });
+}
+
 function updateRouteLegend() {
   const legend = document.getElementById("routeLegend");
   const title = document.getElementById("routeLegendTitle");
@@ -10098,6 +10249,21 @@ window.BIZJET_AIRCRAFT_ICON_VISIBILITY_STANDARD = Object.freeze({
   }
 });
 
+window.BIZJET_MAP_RUNTIME = Object.freeze({
+  provider() {
+    return state.mapProvider;
+  },
+  fallbackReason() {
+    return state.mapFallbackReason || googleMapsAuthFailureReason || "";
+  },
+  googleRenderedErrorVisible() {
+    return googleMapRenderedErrorVisible();
+  },
+  forceFallback(reason = "manual map fallback test") {
+    return fallbackToLeafletMap(reason);
+  }
+});
+
 async function init() {
   bindEvents();
   updateRouteLegend();
@@ -10111,32 +10277,7 @@ async function init() {
   }
   state.mapProvider = state.map.type;
   updateMapModeClass();
-  const refreshViewportData = debounce(() => {
-    state.isInteractingWithMap = false;
-    renderViewport();
-    refreshRealtimeData("viewport");
-  }, mapLoadingConfig.viewportDebounceMs);
-  state.map.onViewportChange({
-    onInteractionStart: () => {
-      state.isInteractingWithMap = true;
-      if (state.followSelectedAircraft) {
-        state.followSelectedAircraft = false;
-        updateFollowButton();
-      }
-    },
-    onVisualChange: () => {
-      renderViewport();
-    },
-    onIdle: refreshViewportData
-  });
-  state.map.onMapClick?.(() => {
-    if (performance.now() - state.lastTargetSelectAt < 180) {
-      return;
-    }
-    if (state.selectedKind || state.selectedId) {
-      clearSelection();
-    }
-  });
+  bindMapViewportEvents();
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
       scheduleNextRealtimeRefresh();

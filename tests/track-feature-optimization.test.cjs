@@ -9,7 +9,7 @@ const stylesSource = fs.readFileSync(path.join(rootDir, "styles.css"), "utf8");
 const docSource = fs.readFileSync(path.join(rootDir, "docs/track-feature-optimization-v1.15.md"), "utf8");
 
 assert.match(htmlSource, /Business Jet Radar 1\.16/, "1.16 page title is active");
-assert.match(htmlSource, /1\.16-hover-complete-popup/, "1.16 cache-busting resource version is active");
+assert.match(htmlSource, /1\.16-google-auth-fallback/, "1.16 cache-busting resource version is active");
 assert.doesNotMatch(htmlSource, /trackQuality|trackActualSegmentCount|trackEstimatedSegmentCount|trackPlannedRouteState|trackRouteColorMode/, "track quality module and its subfields are removed");
 assert.match(htmlSource, /id="trackCurrentAltitude"/, "track tab shows current altitude");
 assert.match(htmlSource, /id="trackCurrentSpeed"/, "track tab shows current ground speed");

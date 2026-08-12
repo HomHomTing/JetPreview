@@ -83,5 +83,50 @@ assert.match(
   /defaultMapProvider[\s\S]*?===\s*"google"[\s\S]*?&&\s*googleMapsApiKey\(\)/,
   "Google map engine is selected only when a real API key is configured"
 );
+assert.match(
+  appSource,
+  /window\.gm_authFailure\s*=\s*\(\)\s*=>\s*{[\s\S]*?scheduleGoogleMapsFallback\("Google Maps API authorization failed"\);[\s\S]*?};/,
+  "Google Maps authorization failures trigger a runtime fallback instead of leaving a gray error map"
+);
+assert.match(
+  appSource,
+  /async\s+function\s+fallbackToLeafletMap\(reason\s*=\s*"Google Maps unavailable"\)[\s\S]*?state\.map\s*=\s*new LeafletMapEngine\(\);[\s\S]*?bindMapViewportEvents\(\);[\s\S]*?renderViewport\(\);/,
+  "Google map fallback rebuilds the map engine and rebinds viewport rendering"
+);
+assert.match(
+  appSource,
+  /destroy\(\)\s*{[\s\S]*?this\.contrastOverlay\?\.setMap\(null\);[\s\S]*?google\.maps\.event\.clearInstanceListeners\(this\.map\);[\s\S]*?}/,
+  "Google map engine cleans native overlays before fallback"
+);
+assert.match(
+  appSource,
+  /function\s+googleMapRenderedErrorVisible\(container\s*=\s*document\.getElementById\("map"\)\)/,
+  "rendered Google Maps error screens are detected from the map container"
+);
+assert.match(
+  appSource,
+  /gm-err-container,\s*\.gm-err-content,\s*\.gm-err-title/,
+  "Google rendered error DOM classes trigger the fallback detector"
+);
+assert.match(
+  appSource,
+  /此页面未能正确加载\\s\*Google\\s\*地图/,
+  "localized Google rendered error copy triggers the fallback detector"
+);
+assert.match(
+  appSource,
+  /watchRenderedAuthErrors\(\)\s*{[\s\S]*?new MutationObserver\(\(\)\s*=>\s*detect\(\)\)[\s\S]*?setInterval/,
+  "Google map engine watches for late rendered authorization errors"
+);
+assert.match(
+  appSource,
+  /Google Maps rendered an authorization error[\s\S]*?scheduleGoogleMapsFallback\("Google Maps rendered an authorization error"\)/,
+  "late rendered Google authorization errors schedule fallback"
+);
+assert.match(
+  appSource,
+  /window\.BIZJET_MAP_RUNTIME\s*=\s*Object\.freeze\({[\s\S]*?provider\(\)[\s\S]*?forceFallback\(reason\s*=\s*"manual map fallback test"\)/,
+  "map runtime exposes fallback diagnostics for browser verification"
+);
 
 console.log("map selection icon visibility: ok");
