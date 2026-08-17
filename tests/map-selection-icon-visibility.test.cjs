@@ -7,6 +7,8 @@ const appSource = fs.readFileSync(path.join(rootDir, "app.js"), "utf8");
 
 const selectAircraftBlock = appSource.match(/function\s+selectAircraft\(id,\s*shouldPan\s*=\s*true,\s*options\s*=\s*{}\)\s*{[\s\S]*?function\s+selectAirport/)?.[0] || "";
 const selectSearchAircraftBlock = appSource.match(/function\s+selectSearchAircraft\(id,\s*options\s*=\s*{}\)\s*{[\s\S]*?function\s+selectSearchAirport/)?.[0] || "";
+const clearSelectionBlock = appSource.match(/function\s+clearSelection\(options\s*=\s*{}\)\s*{[\s\S]*?function\s+apiDebugConsoleConfig/)?.[0] || "";
+const selectAirportBlock = appSource.match(/function\s+selectAirport\(id,\s*shouldPan\s*=\s*true\)\s*{[\s\S]*?function\s+updateRail/)?.[0] || "";
 
 assert.match(
   selectAircraftBlock,
@@ -17,6 +19,61 @@ assert.match(
   selectAircraftBlock,
   /const\s+previousAircraftId\s*=\s*state\.selectedKind\s*===\s*"aircraft"\s*&&\s*state\.selectedId\s*!==\s*id[\s\S]*?state\.selectedId[\s\S]*?rememberRecentlySelectedAircraft\(previousAircraftId\);/,
   "switching aircraft keeps the previously selected aircraft protected from immediate marker removal"
+);
+assert.match(
+  appSource,
+  /recentlySelectedAircraftAt:\s*new\s+Map\(\)/,
+  "recently selected aircraft retention stores timestamps"
+);
+assert.match(
+  appSource,
+  /function\s+pruneRecentlySelectedAircraft\(now\s*=\s*Date\.now\(\)\)[\s\S]*?selectedRetentionMs[\s\S]*?state\.recentlySelectedAircraftAt\.delete\(key\);/,
+  "recently selected aircraft protection expires by the configured retention window"
+);
+assert.match(
+  appSource,
+  /function\s+aircraftIsExpired\(jet\)\s*{[\s\S]*?aircraftWasRecentlySelected\(jet\)[\s\S]*?return\s+false;/,
+  "recently selected aircraft are not treated as expired immediately after selection changes"
+);
+assert.match(
+  appSource,
+  /function\s+aircraftIsProtectedFromRemoval\(jet\)\s*{[\s\S]*?aircraftIsSelected\(jet\)\s*\|\|\s*aircraftWasRecentlySelected\(jet\)/,
+  "selected and recently selected aircraft share one removal-protection rule"
+);
+assert.match(
+  appSource,
+  /function\s+aircraftBySelectionProtectionKey\(key\)[\s\S]*?aircraftById\.get\(normalized\)[\s\S]*?aircraftByUniqueKey\.get\(normalized\)[\s\S]*?aircraftByEncryptedTail\.get\(normalized\)[\s\S]*?aircraftByRegistration\.get\(normalized\)/,
+  "recently selected aircraft can be restored from id, uniqueKey, encrypted tail, or registration indexes"
+);
+assert.match(
+  appSource,
+  /snapshot\.removedAircraftUniqueKeys[\s\S]*?if\s*\(aircraftIsProtectedFromRemoval\(jet\)\)\s*{[\s\S]*?jet\.quality\s*=\s*"stale";/,
+  "removed aircraft snapshots keep recently selected aircraft as stale instead of deleting them"
+);
+assert.match(
+  appSource,
+  /if\s*\(!aircraftIsProtectedFromRemoval\(jet\)\s*&&\s*aircraftIsExpired\(jet\)\)\s*{[\s\S]*?businessJets\.splice\(index,\s*1\);/,
+  "viewport expiry cleanup does not remove recently selected aircraft"
+);
+assert.match(
+  clearSelectionBlock,
+  /const\s+previousAircraftId\s*=\s*state\.selectedKind\s*===\s*"aircraft"\s*\?\s*state\.selectedId\s*:\s*"";[\s\S]*?rememberRecentlySelectedAircraft\(previousAircraftId\);/,
+  "clearing an aircraft selection keeps that aircraft visible through recent-selection protection"
+);
+assert.doesNotMatch(
+  clearSelectionBlock,
+  /clearRecentlySelectedAircraft\(\)/,
+  "clearing the detail panel no longer drops recently selected aircraft from map rendering"
+);
+assert.match(
+  selectAirportBlock,
+  /if\s*\(state\.selectedKind\s*===\s*"aircraft"\s*&&\s*state\.selectedId\)\s*{[\s\S]*?rememberRecentlySelectedAircraft\(state\.selectedId\);/,
+  "switching from an aircraft to an airport keeps the previous aircraft protected"
+);
+assert.doesNotMatch(
+  selectAirportBlock,
+  /clearRecentlySelectedAircraft\(\)/,
+  "airport selection does not clear recent aircraft marker protection"
 );
 assert.match(
   selectAircraftBlock,
@@ -30,8 +87,8 @@ assert.match(
 );
 assert.match(
   appSource,
-  /function\s+renderAfterAircraftDetailUpdate\(currentJet,[\s\S]*?refreshSelectedRouteEndpointCache\(currentJet\);[\s\S]*?renderAircraftDetailPanel\(currentJet\);[\s\S]*?renderViewport\(\);/,
-  "aircraft detail refresh updates the selected view without clearing reduced-icon state"
+  /function\s+renderAfterAircraftDetailUpdate\(currentJet,[\s\S]*?refreshSelectedRouteEndpointCache\(aircraftIsPanelOnly\(currentJet\)\s*\?\s*null\s*:\s*currentJet\);[\s\S]*?renderAircraftDetailPanel\(currentJet\);[\s\S]*?if\s*\(!aircraftIsPanelOnly\(currentJet\)\)\s*{[\s\S]*?renderViewport\(\);/,
+  "aircraft detail refresh updates live selected map aircraft while excluding panel-only aircraft from map rendering"
 );
 assert.match(
   appSource,

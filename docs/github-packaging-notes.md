@@ -1,8 +1,8 @@
 # GitHub Packaging Notes
 
-Current online/GitHub release packaging target: **1.17**.
+Current online/GitHub release packaging target: **1.18**.
 
-The project root is now aligned with the frozen 1.17 release iteration. Frozen historical snapshots are kept in `versions/1.0/`, `versions/1.1/`, `versions/1.2/`, `versions/1.5/`, `versions/1.6/`, `versions/1.8/`, `versions/1.9/`, `versions/1.10/`, `versions/1.11/`, `versions/1.12/`, `versions/1.14/`, `versions/1.16/`, and `versions/1.17/`.
+The project root is now aligned with the frozen 1.18 release iteration. Frozen historical snapshots are kept in `versions/1.0/`, `versions/1.1/`, `versions/1.2/`, `versions/1.5/`, `versions/1.6/`, `versions/1.8/`, `versions/1.9/`, `versions/1.10/`, `versions/1.11/`, `versions/1.12/`, `versions/1.14/`, `versions/1.16/`, `versions/1.17/`, and `versions/1.18/`.
 
 ## Repository Content
 
@@ -30,3 +30,7 @@ Then fill in:
 - `api.authorizedUser`
 
 The shared `data-service.js` default config is credential-free; live access must come from the local `config.js`.
+
+## Public Debug Console Rule
+
+The API debug console is for owner-only local diagnostics. Public online builds must keep `apiDebugConsole.enabled` and `apiDebugConsole.allowPublicHost` disabled, and the app runtime blocks the console on public hostnames unless `allowPublicHost` is deliberately set to `true`.
