@@ -49,15 +49,20 @@ const flightHistory = adaptFlightHistory({
       flightNo: "JTL25C",
       tailNoDisplay: "B-655Z",
       depAirport: "pek",
+      depIcaoCode: "zbaa",
       depAirportFourName: "北京首都国际机场",
       depAirportNameEn: "Beijing Capital International Airport",
       arrAirport: "sha",
+      arrIcaoCode: "zsss",
       arrAirportFourName: "上海虹桥国际机场",
       arrAirportNameEn: "Shanghai Hongqiao International Airport",
       flightState: "30",
       flightStateStr: "途中",
+      depScheduledEpochMs: 1799998800000,
       depActualEpochMs: 1800000000000,
+      arrScheduledEpochMs: 1800006600000,
       arrActualEpochMs: 1800007200000,
+      arrEstimatedEpochMs: 1800007800000,
       depZoneId: "Asia/Shanghai",
       arrZoneId: "Asia/Shanghai",
       estimateTime: "120"
@@ -89,9 +94,41 @@ assert.equal(flightHistory.flights[1].callSign, "B-8288", "513013 keeps registra
 assert.equal(flightHistory.flights[1].flightNo, "B-8288", "513013 exposes registration-like callsign when it is the only callsign value");
 assert.equal(flightHistory.flights[0].depAirport, "PEK", "513013 departure airport code is normalized");
 assert.equal(flightHistory.flights[0].arrAirport, "SHA", "513013 arrival airport code is normalized");
+assert.equal(flightHistory.flights[0].depIcao, "ZBAA", "513013 departure ICAO code is retained for history card display");
+assert.equal(flightHistory.flights[0].arrIcao, "ZSSS", "513013 arrival ICAO code is retained for history card display");
 assert.equal(flightHistory.flights[0].depActualEpochMs, 1800000000000, "513013 departure epoch is available");
 assert.equal(flightHistory.flights[0].arrActualEpochMs, 1800007200000, "513013 arrival epoch is available");
 assert.equal(flightHistory.flights[0].estimateTimeMinutes, 120, "513013 estimate time is normalized to minutes");
+assert.equal(flightHistory.flights[0].times.scheduledDeparture.epochMs, 1799998800000, "513013 scheduled departure is retained separately");
+assert.equal(flightHistory.flights[0].times.actualDeparture.epochMs, 1800000000000, "513013 actual departure does not overwrite scheduled departure");
+assert.equal(flightHistory.flights[0].times.scheduledArrival.epochMs, 1800006600000, "513013 scheduled arrival is retained separately");
+assert.equal(flightHistory.flights[0].times.actualArrival.epochMs, 1800007200000, "513013 actual arrival does not overwrite scheduled arrival");
+assert.equal(flightHistory.flights[0].times.estimatedArrival.epochMs, 1800007800000, "513013 estimated arrival is retained separately");
+
+const aliasedFlightHistory = adaptFlightHistory({
+  page: "1",
+  nextPage: "2",
+  totalRecords: "1",
+  serverNowEpochMs: 1800100000000,
+  list: [{
+    flightId: "FH-LIST-1",
+    uniqueKey: "TRACK-LIST-1",
+    callSign: "BJT901",
+    depAirport: "khN",
+    arrAirport: "pek",
+    flightState: "40",
+    depActualEpochMs: 1800000000000,
+    arrActualEpochMs: 1800007200000,
+    depZoneId: "Asia/Shanghai",
+    arrZoneId: "Asia/Shanghai"
+  }]
+});
+
+assert.equal(aliasedFlightHistory.serverNowEpochMs, 1800100000000, "513013 serverNow is retained as the one-year timeline anchor");
+assert.equal(aliasedFlightHistory.hasNextPage, true, "513013 nextPage pagination aliases are recognized");
+assert.equal(aliasedFlightHistory.totalCount, 1, "513013 totalRecords alias is normalized");
+assert.equal(aliasedFlightHistory.flights.length, 1, "513013 list aliases are retained as history rows");
+assert.equal(aliasedFlightHistory.flights[0].depAirport, "KHN", "513013 aliased departure airport is normalized");
 
 const airportGround = adaptAirportGround({
   airportInfo: {
@@ -176,6 +213,8 @@ assert.deepEqual(airportDynamic.dailyStatistics.inbound, [1, 2, 3], "513015 stat
 const indexSource = readProjectFile("index.html");
 const appSource = readProjectFile("app.js");
 const dataSource = readProjectFile("data-service.js");
+const flightHistoryRequestBlock = dataSource.match(/async\s+getFlightHistory\(tailNo,[\s\S]*?async\s+getAirportGround/)?.[0] || "";
+const renderRecentFlightsBlock = appSource.match(/function\s+renderRecentFlights\(jet(?:,\s*options\s*=\s*\{\})?\)\s*{[\s\S]*?^}\n\nfunction\s+rerenderSelectedHistoryTimeline/m)?.[0] || "";
 
 [
   "aircraftModelEn",
@@ -190,7 +229,8 @@ const dataSource = readProjectFile("data-service.js");
   assert.match(indexSource, new RegExp(`id="${id}"`), `${id} is present in the v1.18 panel markup`);
 });
 
-assert.match(dataSource, /request\("513013",\s*{\s*tailNo\s*}\)/, "513013 is requested with encrypted tailNo only");
+assert.match(flightHistoryRequestBlock, /request\("513013",\s*{\s*tailNo,\s*\.\.\.requestOptions\s*}\)/, "513013 is requested with encrypted tailNo plus history query options");
+assert.doesNotMatch(flightHistoryRequestBlock, /registration|tailNoDisplay|tailNoClear/, "513013 request does not send clear registration fields");
 assert.match(dataSource, /request\("513014",\s*{\s*airportCode\s*}\)/, "513014 is requested with airportCode");
 assert.match(dataSource, /request\("513015",\s*{\s*airportCode\s*}\)/, "513015 is requested with airportCode");
 assert.doesNotMatch(dataSource, /request\("513012"/, "513012 remains stopped");
@@ -229,9 +269,12 @@ assert.match(appSource, /function\s+mergePresentFields\(/, "panel merges keep no
 assert.match(appSource, /function\s+aircraftCallsignLabel\(jet,\s*fallback\s*=\s*NA_TEXT\)[\s\S]*?base\.callSign[\s\S]*?rawBase\.callSign/, "aircraft callsign display reads flightBaseInfo.callSign from track details");
 assert.match(appSource, /function\s+aircraftRegistrationIdentities\(jet\)[\s\S]*?tailNoDisplay[\s\S]*?registration[\s\S]*?comparableAircraftIdentity/, "aircraft callsign display can identify registration-equivalent values");
 assert.match(appSource, /let\s+registrationLikeFallback\s*=\s*"";[\s\S]*?registrationLikeFallback\s*\|\|=\s*value;[\s\S]*?return\s+callsign\s*\?\?\s*\(registrationLikeFallback\s*\|\|\s*displayOrDash\(fallback\)\);/, "aircraft callsign display keeps registration-equivalent callsign as a fallback");
-assert.match(appSource, /setText\("aircraftCallsign",\s*aircraftCallsignLabel\(jet,\s*"暂无航班号"\)\);/, "aircraft header uses the unified callsign display label");
-assert.match(appSource, /const\s+copyCallsign\s*=\s*aircraftCallsignLabel\(jet\);/, "aircraft copy menu uses the unified callsign display label");
-assert.match(appSource, /const\s+callSign\s*=\s*firstMatchedValue\(item\.callSign,\s*item\.flightNo\);[\s\S]*?<strong>\$\{escapeHtml\(firstMatchedValue\(callSign,\s*`\$\{dep\} - \$\{arr\}`\)\)\}<\/strong>/, "aircraft journey rows render corrected trip callsign before the route");
+assert.match(appSource, /const\s+callsignText\s*=\s*aircraftCallsignLabel\(jet,\s*""\);[\s\S]*?const\s+callsignLoading\s*=\s*detailLoading\s*&&\s*!jet\.flightDetail;/, "aircraft header separates callsign loading from loaded empty-state rendering");
+assert.match(appSource, /setText\("aircraftCallsign",\s*callsignLoading\s*\?[\s\S]*?""[\s\S]*?:\s*firstMatchedValue\(callsignText,\s*"暂无航班号"\)\);/, "aircraft header keeps the callsign field text-free while track detail is loading");
+assert.doesNotMatch(`${appSource}\n${indexSource}`, /加载航班信息|正在加载航班信息/, "aircraft detail loading uses a progress affordance instead of flashing loading copy");
+assert.doesNotMatch(`${appSource}\n${indexSource}`, /copyCallsign|copyPanelText|moreAircraftButton|aircraftMoreMenu/, "removed aircraft copy and more-menu controls stay out of the selected aircraft panel");
+assert.match(renderRecentFlightsBlock, /flight:\s*firstMatchedValue\(item\.callSign,\s*item\.flightNo,\s*item\.callsign,\s*item\.flight,\s*item\.taskNo\)/, "aircraft journey rows normalize corrected trip callsign before fallback fields");
+assert.match(renderRecentFlightsBlock, /<strong>\$\{escapeHtml\(firstMatchedValue\(item\.flight,\s*item\.date\)\)\}<\/strong>/, "aircraft journey rows render the normalized trip callsign before secondary timing data");
 assert.match(appSource, /function\s+aircraftIsPanelOnly\(jet\)[\s\S]*?return\s+Boolean\(jet\?\.panelOnly\);/, "panel-only aircraft are explicitly marked");
 assert.match(appSource, /function\s+protectedAircraftForRendering\(selected[\s\S]*?!aircraftIsPanelOnly\(selected\)[\s\S]*?!aircraftIsPanelOnly\(jet\)/, "panel-only aircraft are excluded from protected map rendering");
 assert.match(appSource, /function\s+renderSelectedAircraftTrack\(\)[\s\S]*?aircraftIsPanelOnly\(jet\)[\s\S]*?clearAllRenderedTracks\(\);/, "panel-only aircraft do not draw selected map tracks");

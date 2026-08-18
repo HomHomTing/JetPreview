@@ -5,6 +5,9 @@ const path = require("node:path");
 const rootDir = path.resolve(__dirname, "..");
 const appSource = fs.readFileSync(path.join(rootDir, "app.js"), "utf8");
 const dataServiceSource = fs.readFileSync(path.join(rootDir, "data-service.js"), "utf8");
+const loadAircraftDetailsBlock = appSource.match(/async function loadAircraftDetails\(jet\)[\s\S]*?async function loadAirportDetail/)?.[0] || "";
+const selectAircraftBlock = appSource.match(/function\s+selectAircraft\(id,\s*shouldPan\s*=\s*true,\s*options\s*=\s*{}\)\s*{[\s\S]*?^}/m)?.[0] || "";
+const selectGroundPlaneBlock = appSource.match(/function\s+selectGroundPlaneFromAirport\(airport,\s*plane\s*=\s*{}\)\s*{[\s\S]*?^}/m)?.[0] || "";
 
 assert.match(
   appSource,
@@ -37,7 +40,7 @@ assert.match(
   "selected aircraft detail updates rerender immediately when each detail response arrives"
 );
 assert.doesNotMatch(
-  appSource.match(/async function loadAircraftDetails\(jet\)[\s\S]*?async function loadAirportDetail/)?.[0] || "",
+  loadAircraftDetailsBlock,
   /const\s+\[trackResult,\s*profileResult\]\s*=\s*await\s+Promise\.allSettled/,
   "aircraft detail loading no longer waits for both 513009 and 513011 before applying UI updates"
 );
@@ -60,6 +63,31 @@ assert.match(
   dataServiceSource,
   /cache\.set\(key,\s*{\s*pending,\s*loadedAt:\s*Date\.now\(\)\s*}\);/,
   "detail cache stores pending requests before they resolve"
+);
+assert.match(
+  selectAircraftBlock,
+  /loadAircraftDetails\(jet\);[\s\S]*?openAircraftView\(nextSegment(?:,\s*{[\s\S]*?})?\);[\s\S]*?renderAircraftDetailPanel\(jet\);/,
+  "aircraft selection starts detail loading before the first selected panel render"
+);
+assert.match(
+  selectAircraftBlock,
+  /const\s+previousSelectedKind\s*=\s*state\.selectedKind;[\s\S]*const\s+preservedSegment\s*=[\s\S]*state\.aircraftSegment[\s\S]*const\s+nextSegment\s*=\s*explicitSegment[\s\S]*previousSelectedKind\s*===\s*"aircraft"[\s\S]*\?\s*preservedSegment/,
+  "switching between selected aircraft keeps the currently active aircraft detail tab"
+);
+assert.doesNotMatch(
+  selectAircraftBlock,
+  /selectingDifferentAircraft\s*\?\s*"overview"/,
+  "aircraft-to-aircraft switching no longer forces the detail panel back to overview"
+);
+assert.match(
+  selectGroundPlaneBlock,
+  /loadAircraftDetails\(jet\);[\s\S]*?openAircraftView\("airframe"\);[\s\S]*?renderAircraftDetailPanel\(jet\);/,
+  "ground aircraft selection starts detail loading before the first selected panel render"
+);
+assert.match(
+  loadAircraftDetailsBlock,
+  /state\.detailLoads\.delete\(loadKey\);[\s\S]*?renderAfterAircraftDetailUpdate\(currentJet\);/,
+  "aircraft selection loading state clears only after pending detail requests settle"
 );
 
 console.log("aircraft selection performance: ok");

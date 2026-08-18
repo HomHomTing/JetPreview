@@ -8,8 +8,8 @@ const htmlSource = fs.readFileSync(path.join(rootDir, "index.html"), "utf8");
 const stylesSource = fs.readFileSync(path.join(rootDir, "styles.css"), "utf8");
 const docSource = fs.readFileSync(path.join(rootDir, "docs/track-feature-optimization-v1.15.md"), "utf8");
 
-assert.match(htmlSource, /Business Jet Radar 1\.18/, "1.18 page title is active");
-assert.match(htmlSource, /1\.18-release/, "1.18 cache-busting version is active");
+assert.match(htmlSource, /Business Jet Radar 1\.19/, "1.19 page title is active");
+assert.match(htmlSource, /1\.19-release/, "1.19 release cache-busting version is active");
 assert.doesNotMatch(htmlSource, /trackQuality|trackActualSegmentCount|trackEstimatedSegmentCount|trackPlannedRouteState|trackRouteColorMode/, "track quality module and its subfields are removed");
 assert.match(htmlSource, /id="trackCurrentAltitude"/, "track tab shows current altitude");
 assert.match(htmlSource, /id="trackCurrentSpeed"/, "track tab shows current ground speed");

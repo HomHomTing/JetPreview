@@ -1,0 +1,125 @@
+window.APP_CONFIG = {
+  // Copy this file to config.js for local or production use.
+  googleMapsApiKey: "YOUR_GOOGLE_MAPS_JS_API_KEY",
+  googleMapId: "YOUR_GOOGLE_MAP_ID",
+  googleLanguage: "zh-CN",
+  googleRegion: "CN",
+  googleMapsLoadTimeoutMs: 12000,
+  mapZoomRange: { min: 2, max: 12 },
+  initialMapZoom: 4,
+  initialMapUseUserLocation: true,
+  initialMapLocationTimeoutMs: 6000,
+  mapVerticalBounds: { north: 85, south: -85 },
+  defaultMapProvider: "google",
+  airportLayerMode: "auto",
+  dataMode: "live",
+  performance: {
+    viewportDebounceMs: 360,
+    viewportPaddingRatio: 0.25,
+    showAllAircraftIconsAtAllZooms: true,
+    allAircraftIconRequestLimit: 50000,
+    aircraftLimitByZoom: [
+      { zoom: 3.5, limit: 800 },
+      { zoom: 4.5, limit: 1200 },
+      { zoom: 5.5, limit: 1600 },
+      { zoom: 6.5, limit: 2200 },
+      { zoom: 7.5, limit: 3000 },
+      { zoom: 8.5, limit: 3500 },
+      { zoom: 9.5, limit: 4000 },
+      { zoom: 12, limit: 5000 }
+    ],
+    aircraftLabelLimitByZoom: [
+      { zoom: 5.5, limit: 0 },
+      { zoom: 7.5, limit: 20 },
+      { zoom: 8.5, limit: 60 },
+      { zoom: 9.5, limit: 160 },
+      { zoom: 12, limit: 320 }
+    ],
+    airportFarScaleKm: 300,
+    airportNearScaleKm: 110,
+    airportCodeLabelScaleKm: 65,
+    airportNearFallbackZoom: 8,
+    airportDetailLabelScaleKm: 20,
+    airportViewportRequestLimit: 50000,
+    regularTrackMinZoom: 7,
+    regularTrackMaxAircraft: 120,
+    selectedTrackMaxPoints: 1000,
+    regularTrackMaxPoints: 80,
+    selectedTrackLimitByZoom: [
+      { zoom: 3.5, limit: 160 },
+      { zoom: 5.5, limit: 260 },
+      { zoom: 7, limit: 420 },
+      { zoom: 8.5, limit: 650 },
+      { zoom: 9.5, limit: 850 },
+      { zoom: 12, limit: 1000 }
+    ],
+    routeFocusPadding: { left: 410, right: 48, top: 74, bottom: 78 },
+    routeFocusMinZoom: 2.2,
+    routeFocusMaxZoom: 9.5,
+    groundProjection: {
+      enabled: false,
+      maxAglM: 500,
+      minSunElevationDeg: 5,
+      maxDistanceM: 1500,
+      terminalRadiusM: 45000,
+      maxVisible: 250,
+      highDensityThreshold: 120,
+      minSelectedZoom: 2,
+      minPriorityZoom: 2,
+      minAllZoom: 2,
+      physicalProjectionMinZoom: 6.5,
+      physicalMaxOffsetPx: 10,
+      visualMinOffsetPx: 4,
+      visualMaxOffsetPx: 8,
+      visualShadowBearingDeg: 135
+    },
+    aircraftRefresh: {
+      selectedMs: 2500,
+      normalMs: 4200,
+      globalMs: 6500,
+      airportMs: 3000,
+      hiddenMs: 22000,
+      failureMinMs: 10000,
+      failureMaxMs: 30000,
+      staleAfterMs: 15000,
+      expireAfterMs: 60000,
+      selectedRetentionMs: 180000,
+      interpolationMs: 3000,
+      maxExtrapolationMs: 30000
+    },
+    trackContinuity: {
+      coverageGapMs: 120000,
+      hardBreakGapMs: 600000,
+      duplicateDistanceNm: 0.05,
+      duplicateTimeToleranceMs: 5000,
+      liveTailMaxPoints: 120
+    }
+  },
+  responsivePerformance: {
+    tabletLandscapePanelWidthPx: 360,
+    tabletLandscapePanelMaxVw: 42,
+    tabletPortraitDrawerMidDvh: 56,
+    tabletInteractionRenderFps: 8,
+    tabletHideAirportLabelsDuringInteraction: true
+  },
+  api: {
+    enabled: true,
+    baseUrl: "YOUR_PRIVATE_API_BASE_URL",
+    accountType: "web_map",
+    authorizedUser: { hlUserId: "YOUR_HL_USER_ID" },
+    requestTimeoutMs: 12000,
+    snapshotPid: "513008",
+    refreshMs: 4200,
+    airportRefreshMs: 300000,
+    detailCacheMs: 300000,
+    requireLiveData: true,
+    useMockOnError: false
+  },
+  apiDebugConsole: {
+    enabled: false,
+    allowedHlUserIds: [],
+    allowPublicHost: false,
+    openByDefault: false,
+    maxRequests: 240
+  }
+};
