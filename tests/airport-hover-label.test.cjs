@@ -123,8 +123,8 @@ assert.match(
 );
 assert.match(
   appSource,
-  /function\s+desiredAirportLabelMode\(airport\)\s*{[\s\S]*?if\s*\(airportIsSelected\(airport\)\)\s*{[\s\S]*?return\s+"none";/,
-  "selected airports do not render the old red code label"
+  /function\s+desiredAirportLabelMode\(airport\)\s*{[\s\S]*?return\s+"none";[\s\S]*?}/,
+  "airport persistent labels are suppressed at every map scale"
 );
 assert.match(
   appSource,
@@ -334,8 +334,8 @@ assert.match(
 );
 assert.match(
   stylesSource,
-  /\.airport-pin\.is-selected\s+\.airport-code-label\s*{[\s\S]*?opacity:\s*0;[\s\S]*?visibility:\s*hidden;/,
-  "selected airport red code label is hidden in favor of the information tooltip"
+  /\.airport-code-label\s*{[\s\S]*?display:\s*none;[\s\S]*?opacity:\s*0;[\s\S]*?visibility:\s*hidden;/,
+  "airport persistent code labels are hidden in favor of hover and selected information tooltips"
 );
 
 console.log("airport hover label: ok");

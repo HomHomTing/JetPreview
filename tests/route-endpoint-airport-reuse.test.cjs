@@ -118,8 +118,8 @@ assert.match(
 );
 assert.match(
   stylesSource,
-  /\.airport-pin\.is-route-endpoint\.is-hovered\s+\.airport-code-label\s*{[\s\S]*?opacity:\s*1;[\s\S]*?visibility:\s*visible;/,
-  "route endpoint airports keep their code label visible instead of showing a hover popup"
+  /\.airport-pin\.is-route-endpoint\.is-hovered\s+\.airport-code-label\s*{[\s\S]*?opacity:\s*0;[\s\S]*?visibility:\s*hidden;/,
+  "route endpoint airports also suppress persistent code labels"
 );
 
 console.log("route endpoint airport reuse: ok");

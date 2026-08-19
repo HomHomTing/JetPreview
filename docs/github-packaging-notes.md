@@ -1,8 +1,8 @@
 # GitHub Packaging Notes
 
-Current online/GitHub release packaging target: **1.19**.
+Current online/GitHub release packaging target: **1.20**.
 
-The project root is now aligned with the frozen 1.19 release iteration. Frozen historical snapshots are kept in `versions/1.0/`, `versions/1.1/`, `versions/1.2/`, `versions/1.5/`, `versions/1.6/`, `versions/1.8/`, `versions/1.9/`, `versions/1.10/`, `versions/1.11/`, `versions/1.12/`, `versions/1.14/`, `versions/1.16/`, `versions/1.17/`, `versions/1.18/`, and `versions/1.19/`.
+The project root is now aligned with the frozen 1.20 release iteration. Frozen historical snapshots are kept in `versions/1.0/`, `versions/1.1/`, `versions/1.2/`, `versions/1.5/`, `versions/1.6/`, `versions/1.8/`, `versions/1.9/`, `versions/1.10/`, `versions/1.11/`, `versions/1.12/`, `versions/1.14/`, `versions/1.16/`, `versions/1.17/`, `versions/1.18/`, `versions/1.19/`, and `versions/1.20/`.
 
 ## Repository Content
 

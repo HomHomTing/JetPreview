@@ -51,8 +51,8 @@ assert.match(
 );
 assert.match(
   appSource,
-  /function\s+desiredAirportLabelMode\(airport\)\s*{[\s\S]*?airportDetailLabelScaleKm[\s\S]*?return\s+"full"[\s\S]*?airportCodeLabelScaleKm[\s\S]*?return\s+"code"/,
-  "airport labels follow FR24 full, code and pin scale thresholds"
+  /function\s+desiredAirportLabelMode\(airport\)\s*{[\s\S]*?return\s+"none";[\s\S]*?}/,
+  "airport persistent labels are suppressed at every map scale"
 );
 assert.match(
   appSource,

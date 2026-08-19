@@ -62,7 +62,7 @@ assert.match(
 
 assert.match(
   appSource,
-  /window\.BIZJET_RESPONSIVE_LAYOUT_STANDARD\s*=\s*Object\.freeze\({[\s\S]*version:\s*"1\.19"[\s\S]*currentProfile\(\)[\s\S]*currentInteractionPhase\(\)/,
+  /window\.BIZJET_RESPONSIVE_LAYOUT_STANDARD\s*=\s*Object\.freeze\({[\s\S]*version:\s*"1\.20"[\s\S]*currentProfile\(\)[\s\S]*currentInteractionPhase\(\)/,
   "responsive layout standard is exposed for browser verification"
 );
 

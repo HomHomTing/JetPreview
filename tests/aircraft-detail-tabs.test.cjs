@@ -9,14 +9,17 @@ const stylesSource = fs.readFileSync(path.join(rootDir, "styles.css"), "utf8");
 
 assert.match(
   indexSource,
-  /data-aircraft-segment="airframe"[^>]*>信息<\/button>/,
+  /data-aircraft-segment="airframe"[^>]*>[\s\S]*<use href="#icon-tab-info"><\/use>[\s\S]*<span>信息<\/span>[\s\S]*<\/button>/,
   "airframe tab is labeled as 信息"
 );
 assert.match(
   indexSource,
-  /data-aircraft-segment="journey"[^>]*>行程<\/button>/,
+  /data-aircraft-segment="journey"[^>]*>[\s\S]*<use href="#icon-tab-journey"><\/use>[\s\S]*<span>行程<\/span>[\s\S]*<\/button>/,
   "journey tab is present as a standalone aircraft segment"
 );
+assert.match(indexSource, /<symbol id="icon-tab-overview"[\s\S]*?<symbol id="icon-tab-track"[\s\S]*?<symbol id="icon-tab-info"[\s\S]*?<symbol id="icon-tab-journey"/, "aircraft tabs have dedicated semantic icons");
+assert.match(indexSource, /data-aircraft-segment="overview"[\s\S]*<use href="#icon-tab-overview"><\/use>[\s\S]*<span>概览<\/span>/, "overview tab renders its icon above the Chinese label");
+assert.match(indexSource, /data-aircraft-segment="track"[\s\S]*<use href="#icon-tab-track"><\/use>[\s\S]*<span>航迹<\/span>/, "track tab renders its icon above the Chinese label");
 assert.doesNotMatch(indexSource, /data-aircraft-segment="data"/, "data tab button is removed");
 assert.doesNotMatch(indexSource, /data-aircraft-panel="data"/, "data panel is removed");
 assert.doesNotMatch(indexSource, />机务<\/button>/, "old 机务 tab label is removed");
@@ -83,8 +86,11 @@ assert.match(stylesSource, /\.selected-panel-v114\s+\.aircraft-status-tools\s+sv
 assert.match(stylesSource, /\.selected-panel-v114\s+\.flight-hero\s+\.aircraft-status-tools\s+span\s*{[\s\S]*?line-height:\s*16px;[\s\S]*?transform:\s*translateY\(1px\);/, "follow and route labels are optically centered in the pill buttons");
 assert.match(stylesSource, /\.selected-panel-v114\s+\.aircraft-status-tools\s+button\.active\s*{[\s\S]*?color:\s*var\(--graphite-mint\);[\s\S]*?box-shadow:/, "selected follow and route actions have a distinct active visual state");
 assert.match(stylesSource, /\.selected-panel-v114\s+\.aircraft-status-tools\s+button:disabled\s*{[\s\S]*?color:\s*rgba\(154,\s*163,\s*175,\s*0\.38\);/, "disabled route action has a clear inactive visual state");
-assert.match(stylesSource, /\.selected-panel-v114\s+\.detail-bottom-bar\s*{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\);[\s\S]*?min-height:\s*84px;[\s\S]*?background:\s*linear-gradient/, "bottom aircraft controls use a taller visually distinct tab bar");
-assert.match(stylesSource, /\.selected-panel-v114\s+\.detail-bottom-bar\s+\.detail-segments\s*{[\s\S]*?min-height:\s*62px;/, "bottom aircraft tabs have a larger touch target");
+assert.match(stylesSource, /\.selected-panel-v114\s+\.detail-bottom-bar\s*{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\);[\s\S]*?min-height:\s*96px;[\s\S]*?background:\s*linear-gradient/, "bottom aircraft controls use a taller visually distinct tab bar");
+assert.match(stylesSource, /\.selected-panel-v114\s+\.detail-bottom-bar\s+\.detail-segments\s*{[\s\S]*?min-height:\s*74px;/, "bottom aircraft tabs have a larger touch target");
+assert.match(stylesSource, /\.selected-panel-v114\s+\.detail-bottom-bar\s+\.detail-segments\s+button\s*{[\s\S]*?flex-direction:\s*column;[\s\S]*?gap:\s*5px;[\s\S]*?min-height:\s*62px;[\s\S]*?padding:\s*8px\s+0\s+17px;[\s\S]*?line-height:\s*16px;/, "bottom aircraft tabs stack icon above label with more vertical spacing");
+assert.match(stylesSource, /\.selected-panel-v114\s+\.detail-bottom-bar\s+\.detail-segments\s+button\s+svg\s*{[\s\S]*?width:\s*19px;[\s\S]*?stroke:\s*currentColor;/, "bottom aircraft tab icons use crisp current-color line art");
+assert.match(stylesSource, /\.selected-panel-v114\s+\.detail-bottom-bar\s+\.detail-segments\s+button\.active::after\s*{[\s\S]*?bottom:\s*6px;/, "bottom aircraft active underline sits below the label with clearer spacing");
 assert.match(stylesSource, /\.selected-panel-v114\s+\.detail-bottom-bar\s+\.detail-segments\s+button:hover/, "bottom aircraft tabs expose hover styling to reinforce clickability");
 assert.match(stylesSource, /\.selected-panel-v114\s+\.detail-bottom-bar\s+\.detail-segments\s+button:active\s*{[\s\S]*?transform:\s*translateY\(1px\);/, "bottom aircraft tabs expose an active press hint");
 assert.match(stylesSource, /\.selected-panel-v114\s+\.aircraft-meta-card-type\s*{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1\.35fr\)\s+auto\s+minmax\(0,\s*0\.9fr\);/, "aircraft type code and operator share a compact one-row meta layout");

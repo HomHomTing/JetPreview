@@ -27,10 +27,27 @@ vm.createContext(context);
 vm.runInContext(readProjectFile("data-service.js"), context);
 
 const {
+  adaptFlightTrack,
   adaptFlightHistory,
   adaptAirportGround,
   adaptAirportDynamic
 } = context.window.BIZJET_DATA_SERVICE.adapters;
+
+const flightTrack = adaptFlightTrack({
+  flightBaseInfo: {
+    depActualEpochMs: 1800000000000,
+    arrEstimatedEpochMs: 1800003600000,
+    arrActualEpochMs: 1800007200000,
+    depZoneId: "Asia/Shanghai",
+    arrZoneId: "Asia/Shanghai"
+  },
+  planeInfo: {},
+  coordinates: []
+}, {});
+
+assert.equal(flightTrack.timeRefs.actualDeparture.epochMs, 1800000000000, "513009 actual departure is retained for airport movement cards");
+assert.equal(flightTrack.timeRefs.estimatedArrival.epochMs, 1800003600000, "513009 estimated arrival remains separate");
+assert.equal(flightTrack.timeRefs.actualArrival.epochMs, 1800007200000, "513009 actual arrival is retained separately for airport movement cards");
 
 const flightHistory = adaptFlightHistory({
   currentPage: "2",
@@ -105,6 +122,20 @@ assert.equal(flightHistory.flights[0].times.scheduledArrival.epochMs, 1800006600
 assert.equal(flightHistory.flights[0].times.actualArrival.epochMs, 1800007200000, "513013 actual arrival does not overwrite scheduled arrival");
 assert.equal(flightHistory.flights[0].times.estimatedArrival.epochMs, 1800007800000, "513013 estimated arrival is retained separately");
 
+const fallbackTimeFlightHistory = adaptFlightHistory({
+  data: [{
+    flightId: "FH-FALLBACK",
+    depAirport: "pek",
+    arrAirport: "hkg",
+    flightState: "40",
+    depActualEpochMs: "2026 Dec",
+    actualDepartureEpochMs: 1767139200000,
+    depZoneId: "UTC"
+  }]
+});
+assert.equal(fallbackTimeFlightHistory.flights[0].times.actualDeparture.epochMs, 1767139200000, "513013 history time refs skip raw-only fields and use the next parseable timestamp");
+assert.equal(fallbackTimeFlightHistory.flights[0].times.actualDeparture.sourceField, "513013.actualDepartureEpochMs", "513013 history time refs retain the parseable source field");
+
 const aliasedFlightHistory = adaptFlightHistory({
   page: "1",
   nextPage: "2",
@@ -134,7 +165,9 @@ const airportGround = adaptAirportGround({
   airportInfo: {
     airportCode: "pek",
     icaoCode: "zbaa",
+    airportName: "北京首都国际机场",
     airportNameEn: "Beijing Capital International Airport",
+    cityName: "北京",
     countryName: "中国",
     timeZone: "UTC+8"
   },
@@ -142,6 +175,7 @@ const airportGround = adaptAirportGround({
     groundNum: "7",
     groundPlanes: [{
       tailNo: "YWJjZGVmZ2hpamtsbW5vcA==",
+      tailNoClear: "B-655Z",
       tailNoDisplay: "B-655Z",
       brandName: "Gulfstream",
       modelCode: "glf6",
@@ -165,7 +199,11 @@ const airportGround = adaptAirportGround({
 assert.equal(airportGround.updates.airportCode, "PEK", "513014 airport IATA is normalized");
 assert.equal(airportGround.updates.icaoCode, "ZBAA", "513014 airport ICAO is normalized");
 assert.equal(airportGround.updates.ground, 7, "513014 ground count prefers groundNum");
+assert.equal(airportGround.updates.nameCn, "北京首都国际机场", "513014 Chinese airport name is retained");
+assert.equal(airportGround.updates.nameEn, "Beijing Capital International Airport", "513014 English airport name is retained");
+assert.equal(airportGround.updates.city, "北京", "513014 airport city is retained");
 assert.equal(airportGround.groundPlanes[0].tailNoEncrypted, "YWJjZGVmZ2hpamtsbW5vcA==", "513014 encrypted tail is retained only as an action key");
+assert.equal(airportGround.groundPlanes[0].registrationClear, "B-655Z", "513014 clear registration is normalized separately from the encrypted action key");
 assert.equal(airportGround.groundPlanes[0].registration, "B-655Z", "513014 displayed registration uses clear display text");
 assert.equal(airportGround.groundPlanes[0].modelCode, "GLF6", "513014 ground plane model code is normalized");
 assert.equal(airportGround.groundPlanes[0].flightState, 30, "513014 flight state is numeric");
@@ -177,7 +215,9 @@ const airportDynamic = adaptAirportDynamic({
   airportInfo: {
     airportCode: "pek",
     icaoCode: "zbaa",
+    airportName: "北京首都国际机场",
     airportNameEn: "Beijing Capital International Airport",
+    cityName: "北京",
     lat: "40.0801",
     lon: "116.5846",
     elevation: "35",
@@ -206,6 +246,9 @@ assert.equal(airportDynamic.date, "2026-08-17", "513015 date is retained");
 assert.equal(airportDynamic.weatherInfo.weather, "晴", "513015 airportWeather is adapted to weatherInfo");
 assert.equal(airportDynamic.updates.departures, 5, "513015 departure count is normalized");
 assert.equal(airportDynamic.updates.arrivals, 6, "513015 arrival count is normalized");
+assert.equal(airportDynamic.updates.nameCn, "北京首都国际机场", "513015 Chinese airport name is retained");
+assert.equal(airportDynamic.updates.nameEn, "Beijing Capital International Airport", "513015 English airport name is retained");
+assert.equal(airportDynamic.updates.city, "北京", "513015 airport city is retained");
 assert.equal(airportDynamic.updates.delay, "12 sorties", "513015 sorties summary is retained for dynamic panel");
 assert.equal(airportDynamic.updates.openState, "开放", "513015 open state is retained");
 assert.deepEqual(airportDynamic.dailyStatistics.inbound, [1, 2, 3], "513015 statistics buckets are retained");
@@ -237,7 +280,7 @@ assert.doesNotMatch(dataSource, /request\("513012"/, "513012 remains stopped");
 
 assert.match(
   appSource,
-  /function\s+setAircraftSegment\(segment,[\s\S]*?if\s*\(nextSegment\s*===\s*"journey"\)\s*{[\s\S]*?loadAircraftHistory\(selectedAircraft\(\)\);/,
+  /function\s+setAircraftSegment\(segment,[\s\S]*?if\s*\(nextSegment\s*===\s*"journey"\)\s*{[\s\S]*?const\s+jet\s*=\s*selectedAircraft\(\);[\s\S]*?loadAircraftHistory\(jet,\s*\{/,
   "513013 history is lazy-loaded only when the aircraft journey tab is opened"
 );
 assert.match(
