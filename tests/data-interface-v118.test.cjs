@@ -30,7 +30,8 @@ const {
   adaptFlightTrack,
   adaptFlightHistory,
   adaptAirportGround,
-  adaptAirportDynamic
+  adaptAirportDynamic,
+  adaptAirportDailyFlights
 } = context.window.BIZJET_DATA_SERVICE.adapters;
 
 const flightTrack = adaptFlightTrack({
@@ -135,6 +136,69 @@ const fallbackTimeFlightHistory = adaptFlightHistory({
 });
 assert.equal(fallbackTimeFlightHistory.flights[0].times.actualDeparture.epochMs, 1767139200000, "513013 history time refs skip raw-only fields and use the next parseable timestamp");
 assert.equal(fallbackTimeFlightHistory.flights[0].times.actualDeparture.sourceField, "513013.actualDepartureEpochMs", "513013 history time refs retain the parseable source field");
+
+const malformedTimeFlightHistory = adaptFlightHistory({
+  data: [{
+    flightId: "FH-MALFORMED-TIME",
+    depAirport: "bkk",
+    arrAirport: "pek",
+    flightState: "20",
+    flightStateStr: "计划",
+    depTime1: "2026-08-26 09:00 -",
+    arrTime1: "2026-08-26 14:30 -",
+    depTimeZone: "UTC+07:00",
+    arrTimeZone: "UTC+08:00"
+  }]
+});
+assert.equal(malformedTimeFlightHistory.flights[0].times.actualDeparture.raw, "2026-08-26 09:00", "513013 departure text strips dangling range separators before display");
+assert.equal(malformedTimeFlightHistory.flights[0].times.actualArrival.raw, "2026-08-26 14:30", "513013 arrival text strips dangling range separators before display");
+assert.equal(
+  malformedTimeFlightHistory.flights[0].times.actualDeparture.epochMs,
+  context.window.BIZJET_TIME.normalizeEpochMs("2026-08-26 09:00", { timeZone: "UTC+07:00" }),
+  "513013 cleaned departure text remains parseable in the departure airport time zone"
+);
+assert.equal(
+  malformedTimeFlightHistory.flights[0].times.actualArrival.epochMs,
+  context.window.BIZJET_TIME.normalizeEpochMs("2026-08-26 14:30", { timeZone: "UTC+08:00" }),
+  "513013 cleaned arrival text remains parseable in the arrival airport time zone"
+);
+
+const arrivalFallbackFlightHistory = adaptFlightHistory({
+  data: [{
+    flightId: "FH-ARRIVAL-FALLBACK",
+    depAirport: "bkk",
+    arrAirport: "pek",
+    flightState: "20",
+    flightStateStr: "计划",
+    depTime1: "2026-08-26 09:00 -",
+    estimateTime: "280",
+    depZoneId: "UTC+07:00",
+    arrZoneId: "UTC+08:00"
+  }]
+});
+const fallbackDepartureEpoch = context.window.BIZJET_TIME.normalizeEpochMs("2026-08-26 09:00", { timeZone: "UTC+07:00" });
+assert.equal(arrivalFallbackFlightHistory.flights[0].times.estimatedArrival.epochMs, fallbackDepartureEpoch + 280 * 60000, "513013 missing arrival is filled from departure plus estimateTime minutes");
+assert.equal(arrivalFallbackFlightHistory.flights[0].times.estimatedArrival.sourceField, "513013.depTime1+estimateTime", "513013 duration-derived arrival exposes a stable source field");
+assert.equal(arrivalFallbackFlightHistory.flights[0].arrActualEpochMs, fallbackDepartureEpoch + 280 * 60000, "513013 primary arrival ref uses the duration-derived estimated arrival");
+
+const aliasedArrivalFlightHistory = adaptFlightHistory({
+  data: [{
+    flightId: "FH-ALIASED-ARRIVAL",
+    depAirport: "pek",
+    arrAirport: "sin",
+    flightState: "30",
+    flightStateStr: "途中",
+    depActualEpochMs: 1800000000000,
+    forecastArrTime: "2027-01-15 17:45",
+    depZoneId: "Asia/Shanghai",
+    arrZoneId: "Asia/Singapore"
+  }]
+});
+assert.equal(
+  aliasedArrivalFlightHistory.flights[0].times.estimatedArrival.epochMs,
+  context.window.BIZJET_TIME.normalizeEpochMs("2027-01-15 17:45", { timeZone: "Asia/Singapore" }),
+  "513013 forecast arrival aliases populate the journey arrival time"
+);
 
 const aliasedFlightHistory = adaptFlightHistory({
   page: "1",
@@ -253,10 +317,55 @@ assert.equal(airportDynamic.updates.delay, "12 sorties", "513015 sorties summary
 assert.equal(airportDynamic.updates.openState, "开放", "513015 open state is retained");
 assert.deepEqual(airportDynamic.dailyStatistics.inbound, [1, 2, 3], "513015 statistics buckets are retained");
 
+const airportDailyFlights = adaptAirportDailyFlights({
+  data: [{
+    flightId: "112233",
+    tailNo: "HO0YBjZU/j/IAUw7VJcIZQ==",
+    tailNoDisplay: "N788DP",
+    depCity: "北京首都",
+    arrCity: "深圳",
+    depPlanTime: "2026-08-25 20:49",
+    modelName: "湾流 G650",
+    flightState: 20,
+    flightStateStr: "计划"
+  }]
+}, "PEK", "2026-08-25");
+
+assert.equal(airportDailyFlights.source, "513016", "513016 airport daily flight source is retained");
+assert.equal(airportDailyFlights.airportCode, "PEK", "513016 request airport IATA is normalized");
+assert.equal(airportDailyFlights.localDate, "2026-08-25", "513016 localDate is retained");
+assert.equal(airportDailyFlights.flights.length, 1, "513016 daily flight rows are retained");
+assert.equal(airportDailyFlights.flightsInfo.sortiesEstimate, 1, "513016 exposes row count as a fallback movement total");
+assert.equal(airportDailyFlights.flightsInfo.total, 1, "513016 exposes row count as a fallback total");
+assert.equal(airportDailyFlights.flights[0].tailNoEncrypted, "HO0YBjZU/j/IAUw7VJcIZQ==", "513016 encrypted tail remains an internal action key");
+assert.equal(airportDailyFlights.flights[0].registration, "N788DP", "513016 display registration uses tailNoDisplay");
+assert.equal(airportDailyFlights.flights[0].depAirportName, "北京首都", "513016 departure city is normalized for movement cards");
+assert.equal(airportDailyFlights.flights[0].arrAirportName, "深圳", "513016 arrival city is normalized for movement cards");
+assert.equal(airportDailyFlights.flights[0].depPlanTime, "2026-08-25 20:49", "513016 planned departure time is retained");
+assert.equal(airportDailyFlights.flights[0].modelName, "湾流 G650", "513016 modelName is retained");
+assert.equal(airportDailyFlights.flights[0].flightState, 20, "513016 numeric flightState is normalized");
+assert.equal(airportDailyFlights.flights[0].flightStateStr, "计划", "513016 flightStateStr is retained");
+
+const airportDailyFlightsWithSummary = adaptAirportDailyFlights({
+  flightsInfo: {
+    sortiesEstimate: "13",
+    inboundActually: "3",
+    outboundActually: "4",
+    inboundPlan: "6",
+    outboundPlan: "5"
+  },
+  data: []
+}, "PEK", "2026-08-25");
+assert.equal(airportDailyFlightsWithSummary.flights.length, 0, "513016 can return summary before displayable rows");
+assert.equal(airportDailyFlightsWithSummary.flightsInfo.sortiesEstimate, "13", "513016 keeps API movement totals even when rows are temporarily empty");
+assert.equal(airportDailyFlightsWithSummary.flightsInfo.inboundPlan, "6", "513016 keeps planned inbound counts for dynamic filters");
+assert.equal(airportDailyFlightsWithSummary.flightsInfo.outboundPlan, "5", "513016 keeps planned outbound counts for dynamic filters");
+
 const indexSource = readProjectFile("index.html");
 const appSource = readProjectFile("app.js");
 const dataSource = readProjectFile("data-service.js");
 const flightHistoryRequestBlock = dataSource.match(/async\s+getFlightHistory\(tailNo,[\s\S]*?async\s+getAirportGround/)?.[0] || "";
+const airportDailyFlightsRequestBlock = dataSource.match(/async\s+getAirportDailyFlights\(airportCode,\s*localDate\)[\s\S]*?async\s+cached/)?.[0] || "";
 const renderRecentFlightsBlock = appSource.match(/function\s+renderRecentFlights\(jet(?:,\s*options\s*=\s*\{\})?\)\s*{[\s\S]*?^}\n\nfunction\s+rerenderSelectedHistoryTimeline/m)?.[0] || "";
 
 [
@@ -276,6 +385,8 @@ assert.match(flightHistoryRequestBlock, /request\("513013",\s*{\s*tailNo,\s*\.\.
 assert.doesNotMatch(flightHistoryRequestBlock, /registration|tailNoDisplay|tailNoClear/, "513013 request does not send clear registration fields");
 assert.match(dataSource, /request\("513014",\s*{\s*airportCode\s*}\)/, "513014 is requested with airportCode");
 assert.match(dataSource, /request\("513015",\s*{\s*airportCode\s*}\)/, "513015 is requested with airportCode");
+assert.match(airportDailyFlightsRequestBlock, /request\("513016",\s*{\s*airportCode:\s*normalizedAirportCode,\s*localDate:\s*date\s*}\)/, "513016 is requested with airportCode and localDate");
+assert.match(airportDailyFlightsRequestBlock, /cacheKey\s*=\s*`\$\{normalizedAirportCode\}:\$\{date\}`/, "513016 cache is scoped by airport and local date");
 assert.doesNotMatch(dataSource, /request\("513012"/, "513012 remains stopped");
 
 assert.match(

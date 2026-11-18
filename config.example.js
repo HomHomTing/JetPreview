@@ -16,6 +16,9 @@ window.APP_CONFIG = {
   performance: {
     viewportDebounceMs: 360,
     viewportPaddingRatio: 0.25,
+    aircraftViewportPaddingRatio: 0.15,
+    viewportRefreshMinShiftRatio: 0.18,
+    viewportRefreshMinZoomDelta: 0.5,
     showAllAircraftIconsAtAllZooms: true,
     allAircraftIconRequestLimit: 50000,
     aircraftLimitByZoom: [
@@ -78,7 +81,9 @@ window.APP_CONFIG = {
       normalMs: 4200,
       globalMs: 6500,
       airportMs: 3000,
-      hiddenMs: 22000,
+      hiddenMs: 60000,
+      hiddenPauseAfterMs: 300000,
+      resumeAirportDelayMs: 6000,
       failureMinMs: 10000,
       failureMaxMs: 30000,
       staleAfterMs: 15000,

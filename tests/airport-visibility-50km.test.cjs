@@ -43,7 +43,7 @@ assert.match(
   /function\s+airportRenderLimit\(\)\s*{[\s\S]*?return\s+Number\.POSITIVE_INFINITY;/,
   "airport rendering has no client-side count truncation"
 );
-assert.doesNotMatch(appSource, /airportDensityGridAllows|densityBand\.cellPx/);
+assert.doesNotMatch(appSource, /DEFAULT_AIRPORT_DENSITY_STRATEGY|parkingTierMode|minGroundNum|airportDensityBand|airportDensityGridAllows|densityBand\.cellPx/);
 assert.match(
   appSource,
   /function\s+airportsForCurrentView\(\)\s*{[\s\S]*?positionInBounds[\s\S]*?item\.level\s*<=\s*maxLevel[\s\S]*?addProtectedAirports\(rendered,\s*protectedIds\);/,

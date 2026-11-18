@@ -1,8 +1,8 @@
-# Global BizJet Ops 1.20
+# Global BizJet Ops 1.21
 
-V1.20 prototype for a web-based aircraft operations map, icon test system, ICAO-code icon control console, private operations database integration, normalized selected-aircraft route visualization, selected-track live continuity, Graphite selected aircraft/airport detail panels, FR24-style search interaction, all-zoom aircraft icon visibility testing, ICAO-code-driven aircraft icon rendering, selected-track analysis optimization, stable map marker ordering, FR24-calibrated airport loading, airport parking-count badges, expanded airport ground and movement panels, updated private interface field mapping, owner-only API debugging, and a 365-day aircraft history timeline.
+V1.21 prototype for a web-based aircraft operations map, icon test system, ICAO-code icon control console, private operations database integration, normalized selected-aircraft route visualization, selected-track live continuity, Graphite selected aircraft/airport detail panels, FR24-style search interaction, viewport-scoped aircraft refresh, ICAO-code-driven aircraft icon rendering, selected-track analysis optimization, stable map marker ordering, FR24-calibrated airport loading, airport parking-count badges, consistent airport movement data, updated private interface field mapping, owner-only API debugging, and a 365-day aircraft history timeline.
 
-Version 1.20 is frozen under `versions/1.20/` and is the current online/GitHub release target. Version 1.19 remains frozen under `versions/1.19/`.
+Version 1.21 is frozen under `versions/1.21/` and is the current online/GitHub release target. Version 1.20 remains frozen under `versions/1.20/`.
 
 Version history is summarized in `CHANGELOG.md`. GitHub packaging and credential-handling notes are documented in `docs/github-packaging-notes.md`.
 
@@ -37,6 +37,10 @@ Version 1.18 is frozen under `versions/1.18/`.
 Version 1.19 is frozen under `versions/1.19/`.
 
 Version 1.20 is frozen under `versions/1.20/`.
+
+Version 1.21 is frozen under `versions/1.21/`.
+
+Version 1.21 unifies airport movement KPIs, filters, and detail rows around the 513016 daily-flight feed; adds compact incremental FIDS rendering and on-demand history/track enrichment; reduces realtime traffic with viewport-scoped minimal aircraft snapshots, movement thresholds, and hidden-page suspension; cleans malformed time ranges; and adds a live map scale indicator.
 
 Version 1.20 expands the airport detail experience with complete airport identity and UTC timezone fields, full ground-fleet lists and composition filters, paired local departure/arrival timelines, history-backed route enrichment, and airport parking-count badges that share the airport marker lifecycle at every map scale.
 

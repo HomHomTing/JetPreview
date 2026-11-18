@@ -117,7 +117,7 @@ assert.match(
 );
 assert.match(
   appSource,
-  /function\s+airportMarkerIsVisible\(airport\)[\s\S]*?metrics\.visualWidth\s*>\s*0[\s\S]*?metrics\.visualHeight\s*>\s*0[\s\S]*?function\s+airportsForCurrentView\(\)[\s\S]*?filter\(airportMarkerIsVisible\)[\s\S]*?airportMarkerIsVisible\(item\.airport\)/,
+  /function\s+airportMarkerIsVisible\(airport\)[\s\S]*?metrics\.visualWidth\s*>\s*0[\s\S]*?metrics\.visualHeight\s*>\s*0[\s\S]*?function\s+airportsForCurrentView\(\)[\s\S]*?\.filter\(airportMarkerIsVisible\)/,
   "zero-size airport icons and their badges are removed from the render queue together"
 );
 assert.match(

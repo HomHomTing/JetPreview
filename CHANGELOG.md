@@ -1,5 +1,19 @@
 # Version History
 
+## 1.21
+
+- Frozen under `versions/1.21/` and published as the current online/GitHub release target.
+- Unifies airport movement KPIs, direction filters, and visible rows so planned totals, actual arrivals/departures, and loaded details retain distinct data meanings.
+- Adapts the `513016` daily-flight interface and combines it with existing airport detail sources without inventing missing movement rows.
+- Replaces the heavy airport movement card timeline with a compact FIDS-style table, bounded initial rendering, explicit load-more behavior, and per-row expansion.
+- Moves history, track, and aircraft-profile enrichment behind bounded, cached, on-demand requests to reduce unnecessary network traffic and panel scroll work.
+- Improves missing airport-movement arrival times through targeted `513013` history and `513009` track enrichment while preserving multi-leg flights in deduplication.
+- Cleans malformed time strings and dangling range separators before parsing or display, including duration-derived arrival fallbacks.
+- Changes realtime aircraft snapshots from global payloads to lightweight padded-viewport requests with meaningful pan/zoom thresholds.
+- Lowers hidden-page polling, pauses it after five minutes, invalidates stale requests, and prioritizes aircraft refresh before delayed airport refresh when the page resumes.
+- Adds a bottom-right map scale indicator shared by Google Maps and the Leaflet fallback.
+- Refines the 365-day aircraft history timeline with bounded rendering, filtering, detail expansion, and stable scroll behavior.
+
 ## 1.20
 
 - Frozen under `versions/1.20/` and published as the current online/GitHub release target.

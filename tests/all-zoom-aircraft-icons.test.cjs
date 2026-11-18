@@ -22,7 +22,12 @@ assert.equal(
 );
 assert.ok(
   performanceConfig.allAircraftIconRequestLimit >= 50000,
-  "all-zoom aircraft requests keep a high global request ceiling"
+  "all-zoom aircraft requests keep a high current-viewport request ceiling"
+);
+assert.equal(
+  performanceConfig.aircraftViewportPaddingRatio,
+  0.15,
+  "aircraft requests use a smaller current-viewport padding for traffic control"
 );
 
 assert.match(
@@ -42,8 +47,13 @@ assert.match(
 );
 assert.match(
   appSource,
-  /const\s+bounds\s*=\s*aircraftIconVisibilityUsesGlobalScope\(\)\s*\?\s*null\s*:\s*currentViewportBounds\(mapLoadingConfig\.viewportPaddingRatio\);/s,
-  "aircraft icons are not viewport-filtered when global all-zoom visibility is enabled"
+  /function\s+aircraftIconVisibilityUsesGlobalScope\(\)\s*{\s*return\s+false;\s*}/,
+  "all-zoom icon visibility no longer forces global aircraft requests"
+);
+assert.match(
+  appSource,
+  /const\s+bounds\s*=\s*currentViewportBounds\(mapLoadingConfig\.aircraftViewportPaddingRatio\);/s,
+  "aircraft icons are filtered to the current viewport while staying visible at every zoom"
 );
 assert.match(
   appSource,
@@ -52,8 +62,13 @@ assert.match(
 );
 assert.match(
   appSource,
-  /aircraftScope:\s*aircraftIconVisibilityUsesGlobalScope\(\)\s*\?\s*"global"\s*:\s*"viewport"/,
-  "aircraft viewport requests switch to global scope for all-zoom icon visibility"
+  /aircraftScope:\s*"viewport"/,
+  "aircraft requests stay scoped to the current viewport for traffic control"
+);
+assert.match(
+  appSource,
+  /payloadMode:\s*"minimal"[\s\S]*?fields:\s*"map"[\s\S]*?includeAirports:\s*false/,
+  "aircraft realtime requests ask for minimal map payloads without duplicating airport lists"
 );
 assert.match(
   appSource,

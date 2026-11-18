@@ -2,11 +2,54 @@
   const ISO_WITH_ZONE_PATTERN = /^\d{4}-\d{2}-\d{2}(?:[T\s]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?)?(?:Z|[+-]\d{2}:?\d{2})$/i;
   const LOCAL_DATE_TIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?$/;
   const UTC_OFFSET_PATTERN = /^(?:UTC|GMT)?\s*([+-])\s*(\d{1,2})(?::?(\d{2}))?$/i;
+  const TIME_PLACEHOLDER_PATTERN = /^(?:--|-|\u2013|\u2014|N\/A|NA|NULL|UNDEFINED)$/i;
+  const TIME_TRAILING_RANGE_SEPARATOR_PATTERN = /\s*(?:--|-|\u2013|\u2014|~|\u301c|\u2192|->|=>|\u81f3|\u5230)\s*$/u;
+  const TIME_LEADING_RANGE_SEPARATOR_PATTERN = /^\s*(?:--|-|\u2013|\u2014|~|\u301c|\u2192|->|=>|\u81f3|\u5230)\s*/u;
+  const TIME_ARROW_SEPARATOR_PATTERN = /\s*(?:\u2192|->|=>)\s*/u;
+  const TIME_RANGE_SEPARATOR_PATTERN = /\s+(?:--|-|\u2013|\u2014|~|\u301c|\u81f3|\u5230)\s+/u;
   const knownIanaTimeZones = new Map();
 
   function finiteNumber(value) {
     const number = Number(value);
     return Number.isFinite(number) ? number : null;
+  }
+
+  function timePlaceholder(value) {
+    const text = String(value ?? "").trim();
+    return !text || TIME_PLACEHOLDER_PATTERN.test(text.replace(/\s+/g, ""));
+  }
+
+  function cleanTimeText(value, options = {}) {
+    if (value === null || value === undefined) {
+      return "";
+    }
+    const text = String(value).replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+    if (timePlaceholder(text)) {
+      return "";
+    }
+    const arrowParts = text.split(TIME_ARROW_SEPARATOR_PATTERN).map(cleanSingleTimeText).filter(Boolean);
+    if (arrowParts.length > 1) {
+      return options.rangePart === "arrival" ? arrowParts[arrowParts.length - 1] : arrowParts[0];
+    }
+    const rangeParts = text.split(TIME_RANGE_SEPARATOR_PATTERN).map(cleanSingleTimeText).filter(Boolean);
+    if (rangeParts.length > 1) {
+      return options.rangePart === "arrival" ? rangeParts[rangeParts.length - 1] : rangeParts[0];
+    }
+    return cleanSingleTimeText(text);
+  }
+
+  function cleanSingleTimeText(value) {
+    const text = String(value || "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+    if (timePlaceholder(text)) {
+      return "";
+    }
+    const cleaned = text
+      .replace(/(^|\s)(?:N\/A|NA|NULL|UNDEFINED)(?=\s|$)/gi, " ")
+      .replace(TIME_TRAILING_RANGE_SEPARATOR_PATTERN, "")
+      .replace(TIME_LEADING_RANGE_SEPARATOR_PATTERN, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    return timePlaceholder(cleaned) ? "" : cleaned;
   }
 
   function normalizeEpochMs(value, options = {}) {
@@ -21,7 +64,7 @@
     if (numeric !== null) {
       return numeric > 10000000000 ? numeric : numeric * 1000;
     }
-    const text = String(value).trim();
+    const text = cleanTimeText(value, options);
     if (!text) {
       return null;
     }
@@ -51,8 +94,12 @@
     const zone = normalizeZone(options.timeZone || options.zone || options.displayZone || "");
     const sourceField = options.sourceField || "";
     const semantic = options.semantic || "";
-    const raw = value === null || value === undefined ? "" : String(value);
-    const epochMs = normalizeEpochMs(value, { timeZone: zone });
+    const raw = value === null || value === undefined
+      ? ""
+      : typeof value === "number" || value instanceof Date
+        ? String(value)
+        : cleanTimeText(value, options);
+    const epochMs = normalizeEpochMs(value, { ...options, timeZone: zone });
     const offsetMinutes = parseUtcOffsetMinutes(zone);
     const confidence = epochMs !== null
       ? zone
@@ -303,7 +350,8 @@
     }
     if (ref.raw) {
       const label = zoneLabel(ref.displayZone);
-      return `${ref.raw}${label ? ` ${label}` : " timezone unknown"}`;
+      const raw = cleanTimeText(ref.raw, options);
+      return raw ? `${raw}${label ? ` ${label}` : " timezone unknown"}` : options.fallback || "N/A";
     }
     return options.fallback || "N/A";
   }
@@ -343,6 +391,7 @@
     normalizeEpochMs,
     makeTimeRef,
     makeFirstTimeRef,
+    cleanTimeText,
     parseUtcOffsetMinutes,
     isIanaTimeZone,
     zoneLabel,

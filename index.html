@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Business jet map interface prototype.">
-    <title>Business Jet Radar 1.20</title>
+    <title>Business Jet Radar 1.21</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%23ffd21c' stroke='%23161616' stroke-width='1.5' d='M16 2c1.7 0 2.8 7.7 3.2 10.6l10 4.2c.6.2.9.8.9 1.4v1.9l-10.7-2.4-.6 5.1 4.2 2.6v2l-5.8-1.3L16 31l-1.3-4.9-5.8 1.3v-2l4.2-2.6-.6-5.1-10.7 2.4v-1.9c0-.6.3-1.2.9-1.4l10-4.2C13.2 9.7 14.3 2 16 2Z'/%3E%3C/svg%3E">
     <link
       rel="stylesheet"
@@ -12,7 +12,7 @@
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
       crossorigin=""
     >
-    <link rel="stylesheet" href="./styles.css?v=1.20-release">
+    <link rel="stylesheet" href="./styles.css?v=1.21-release">
   </head>
   <body>
     <svg aria-hidden="true" class="icon-sprite">
@@ -405,9 +405,9 @@
             <section class="detail-segment-panel" data-airport-panel="dynamic" hidden>
               <section class="detail-section airport-dynamic-section">
                 <div class="airport-summary-strip airport-dynamic-kpis" aria-label="Airport day summary">
-                  <div><strong id="airportSorties">—</strong><span>今日架次</span></div>
-                  <div><strong id="airportInbound">—</strong><span>进港</span></div>
-                  <div><strong id="airportOutbound">—</strong><span>出港</span></div>
+                  <div><strong id="airportSorties">—</strong><span>今日预计</span></div>
+                  <div><strong id="airportInbound">—</strong><span>实际进港</span></div>
+                  <div><strong id="airportOutbound">—</strong><span>实际出港</span></div>
                 </div>
                 <div id="airportDynamicFilterBar" class="airport-direction-filter" role="group" aria-label="Airport direction filter"></div>
                 <div class="airport-fids-board">
@@ -536,6 +536,11 @@
         </div>
       </section>
 
+      <section class="map-scale-control" id="mapScaleControl" aria-label="Map scale">
+        <span id="mapScaleValue">100 km</span>
+        <i aria-hidden="true"></i>
+      </section>
+
       <section id="filterSheet" class="filter-sheet" aria-label="Filters" hidden>
         <div class="sheet-head">
           <div>
@@ -589,12 +594,12 @@
       integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
       crossorigin=""
     ></script>
-    <script src="./config.js?v=1.20-release"></script>
-    <script src="./aircraft-icon-config.js?v=1.20-release"></script>
-    <script src="./aircraft-icon-runtime-config.js?v=1.20-release"></script>
-    <script src="./time-utils.js?v=1.20-release"></script>
-    <script src="./data-service.js?v=1.20-release"></script>
+    <script src="./config.js?v=1.21-release"></script>
+    <script src="./aircraft-icon-config.js?v=1.21-release"></script>
+    <script src="./aircraft-icon-runtime-config.js?v=1.21-release"></script>
+    <script src="./time-utils.js?v=1.21-release"></script>
+    <script src="./data-service.js?v=1.21-release"></script>
     <script src="./ground-projection-core.js?v=1.11"></script>
-    <script src="./app.js?v=1.20-release"></script>
+    <script src="./app.js?v=1.21-release"></script>
   </body>
 </html>

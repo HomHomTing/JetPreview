@@ -133,7 +133,7 @@ assert.match(
 
 assert.match(
   indexSource,
-  /styles\.css\?v=1\.20-release[\s\S]*app\.js\?v=1\.20-release/,
+  /styles\.css\?v=1\.21-release[\s\S]*app\.js\?v=1\.21-release/,
   "release busts cached app and style assets"
 );
 
@@ -245,8 +245,8 @@ assert.match(
 
 assert.match(
   appSource,
-  /function\s+renderHistoryFlightTableRow\(item,\s*options\s*=\s*{}\)[\s\S]*history-flight-row-main[\s\S]*history-flight-date-cell[\s\S]*history-flight-route-cell[\s\S]*history-flight-duration-cell/,
-  "history rows use the v1.24 table row structure with date, route, and duration columns"
+  /function\s+renderHistoryFlightTableRow\(item,\s*options\s*=\s*{}\)[\s\S]*history-flight-row-main[\s\S]*history-flight-route-cell[\s\S]*history-flight-duration-cell[\s\S]*history-flight-time-pair/,
+  "history rows use the v1.25 day-grouped structure with route, duration, and paired local times"
 );
 
 assert.match(
@@ -269,20 +269,20 @@ assert.match(
 
 assert.match(
   appSource,
-  /function\s+renderHistoryFlightTableRow\(item,\s*options\s*=\s*{}\)[\s\S]*const\s+depAirport\s*=\s*historyAirportDisplay\(item,\s*"dep"\);[\s\S]*const\s+arrAirport\s*=\s*historyAirportDisplay\(item,\s*"arr"\);[\s\S]*history-flight-airport-names[\s\S]*history-flight-airport-codes[\s\S]*history-flight-local-times/,
-  "history rows render airport names first, IATA / ICAO codes second, and LT times third"
+  /function\s+renderHistoryFlightTableRow\(item,\s*options\s*=\s*{}\)[\s\S]*const\s+depAirport\s*=\s*historyAirportDisplay\(item,\s*"dep"\);[\s\S]*const\s+arrAirport\s*=\s*historyAirportDisplay\(item,\s*"arr"\);[\s\S]*history-flight-airport-dep[\s\S]*history-flight-duration-cell[\s\S]*history-flight-airport-arr[\s\S]*history-flight-time-depart[\s\S]*history-flight-time-arrive/,
+  "history rows split departure and arrival airports left/right around the duration and status center"
 );
 
 assert.match(
   appSource,
-  /function\s+renderHistoryFlightTableRow\(item,\s*options\s*=\s*{}\)[\s\S]*historyDayOffsetLabel\(depRef,\s*arrRef\)[\s\S]*history-flight-local-times/,
-  "history rows render cross-day labels next to the local arrival time"
+  /function\s+renderHistoryFlightTableRow\(item,\s*options\s*=\s*{}\)[\s\S]*historyDayOffsetLabel\(depRef,\s*arrRef\)[\s\S]*history-flight-time-arrive[\s\S]*<mark>\$\{escapeHtml\(dayOffset\)\}<\/mark>/,
+  "history rows render cross-day labels after the local arrival time"
 );
 
 assert.match(
   appSource,
-  /function\s+renderHistoryTimelineGroups\(flights\)[\s\S]*const\s+currentFlightKey\s*=\s*historyFlightKey\(historyCurrentLiveFlight\(null,\s*flights\)\);[\s\S]*history-flight-table[\s\S]*history-month-table-group[\s\S]*group\.flights\.map\(\(item\)\s*=>\s*renderHistoryFlightTableRow\(item,\s*\{\s*current:/,
-  "history list renders records grouped by month without the old date, route, and duration table header"
+  /function\s+renderHistoryTimelineGroups\(flights\)[\s\S]*timeline\.anchorDay[\s\S]*historyDayKey\(item\)[\s\S]*history-flight-table[\s\S]*history-day-table-group[\s\S]*data-history-day-group[\s\S]*group\.flights\.map\(\(item\)\s*=>\s*renderHistoryFlightTableRow\(item,\s*\{\s*current:/,
+  "history list renders records grouped by day with the date shown once in the group header"
 );
 
 assert.doesNotMatch(
@@ -365,6 +365,18 @@ assert.match(
 
 assert.match(
   appSource,
+  /async\s+function\s+loadAircraftHistory\(jet,\s*options\s*=\s*\{\}\)[\s\S]*if\s*\(!dataService\?\.isEnabled\(\)\)\s*{[\s\S]*applyStaticAircraftHistory\(jet\)[\s\S]*if\s*\(!historyTailNo\)\s*{[\s\S]*aircraftDetailIsLoading\(jet\)\s*\|\|\s*aircraftNeedsDetailLoad\(jet\)[\s\S]*loadAircraftDetails\(jet\);[\s\S]*setRecentFlightsHtml\(`<p class="empty-related">行程记录等待飞机信息同步\.\.\.<\/p>`/,
+  "first aircraft selection waits for detail fields when 513013 cannot be requested yet instead of flashing an empty history"
+);
+
+assert.doesNotMatch(
+  appSource,
+  /if\s*\(!dataService\?\.isEnabled\(\)\s*\|\|\s*!historyTailNo\)\s*{[\s\S]*applyStaticAircraftHistory\(jet\)/,
+  "missing aircraft history request fields no longer use the static/empty history path in live data mode"
+);
+
+assert.match(
+  appSource,
   /function\s+aircraftHistoryLoadTarget\(seedJet,\s*historyTailNo\)[\s\S]*aircraftByDetailSeed\(seedJet\)[\s\S]*const\s+selected\s*=\s*selectedAircraft\(\);[\s\S]*selectedTailNo\s*&&\s*selectedTailNo\s*===\s*historyTailNo[\s\S]*aircraftProfileKeysOverlap\(selected,\s*seedJet\)/,
   "aircraft history completion can still target the currently selected aircraft after the live snapshot replaces the original object"
 );
@@ -437,14 +449,44 @@ assert.match(
 
 assert.match(
   appSource,
+  /arrivalEnrichmentMax:\s*120[\s\S]*arrivalEnrichmentConcurrency:\s*4/,
+  "history arrival enrichment is bounded and concurrent enough for visible journey cards"
+);
+
+assert.match(
+  appSource,
+  /async\s+function\s+fetchAircraftHistoryDetail\(tailNoEncrypted\)[\s\S]*dataService\.getFlightHistory\(tailNoEncrypted,\s*historyRequestOptions\(page\)\)[\s\S]*return\s+enrichFlightHistoryArrivalsFromTracks\(merged\);/,
+  "513013 history rows are passed through 513009 arrival enrichment before first render"
+);
+
+assert.match(
+  appSource,
+  /async\s+function\s+enrichFlightHistoryArrivalsFromTracks\(detail,\s*options\s*=\s*\{\}\)[\s\S]*historyArrivalEnrichmentCandidates\(detail\)\.slice\(0,\s*maxCandidates\)[\s\S]*Promise\.allSettled\(batch\.map\(async\s+\(flight\)\s*=>[\s\S]*dataService\.getFlightTrack\(uniqueKey\)[\s\S]*applyFlightTrackTimesToHistoryFlight\(flight,\s*trackDetail\)[\s\S]*arrivalEnrichedFrom\s*=\s*"513009"/,
+  "missing journey arrival times are supplemented from 513009 track details by uniqueKey with optional per-caller bounds"
+);
+
+assert.match(
+  appSource,
+  /function\s+applyFlightTrackTimesToHistoryFlight\(flight,\s*detail\)[\s\S]*mergeHistoryFlightTimeRefFromTrack\(flight,\s*"actualArrival"[\s\S]*mergeHistoryFlightTimeRefFromTrack\(flight,\s*"estimatedArrival"[\s\S]*mergeHistoryFlightTimeRefFromTrack\(flight,\s*"scheduledArrival"[\s\S]*flight\.arrTimeRef\s*=\s*arrRef;[\s\S]*flight\.arrActualEpochMs\s*=\s*arrRef\.epochMs;/,
+  "513009 actual, estimated, and scheduled arrival refs can become the primary journey arrival time"
+);
+
+assert.match(
+  appSource,
+  /function\s+historyTimeRefIsDurationFallback\(ref\)[\s\S]*depTime1\+estimateTime[\s\S]*function\s+historyFlightArrivalNeedsEnrichment\(item\)[\s\S]*historyTimeRefIsDurationFallback\(primary\)[\s\S]*function\s+mergeHistoryFlightTimeRefFromTrack\(flight,\s*key,\s*trackRef\)[\s\S]*Number\.isFinite\(Number\(current\?\.epochMs\)\)\s*&&\s*!historyTimeRefIsDurationFallback\(current\)/,
+  "duration-derived arrival placeholders remain eligible for 513009 replacement"
+);
+
+assert.match(
+  appSource,
   /function\s+setRecentFlightsHtml\(html,\s*options\s*=\s*{}\)[\s\S]*const\s+htmlChanged\s*=\s*timeline\.recentFlightsHtml\s*!==\s*nextHtml[\s\S]*const\s+shouldRestoreScroll\s*=\s*Boolean\(snapshot\s*&&\s*!snapshot\.skipScrollRestore\);[\s\S]*if\s*\(htmlChanged\)\s*{[\s\S]*element\.innerHTML\s*=\s*nextHtml[\s\S]*timeline\.recentFlightsHtml\s*=\s*nextHtml[\s\S]*if\s*\(htmlChanged\)\s*{[\s\S]*if\s*\(shouldRestoreScroll\)\s*{[\s\S]*restoreHistoryScrollState\(snapshot\);/,
   "history list skips identical HTML rerenders and only restores scroll after real DOM changes outside active user scrolling"
 );
 
 assert.match(
   appSource,
-  /function\s+captureHistoryScrollAnchor\(scroller\)[\s\S]*querySelectorAll\("\[data-history-flight-card\],\s*\[data-history-month-group\]"\)[\s\S]*offsetTop:[\s\S]*selected\.rect\.top\s*-\s*scrollerRect\.top[\s\S]*function\s+captureHistoryScrollState/,
-  "history scroll capture stores the first visible flight/month anchor instead of relying on document edges"
+  /function\s+captureHistoryScrollAnchor\(scroller\)[\s\S]*querySelectorAll\("\[data-history-flight-card\],\s*\[data-history-month-group\],\s*\[data-history-day-group\]"\)[\s\S]*offsetTop:[\s\S]*selected\.rect\.top\s*-\s*scrollerRect\.top[\s\S]*function\s+captureHistoryScrollState/,
+  "history scroll capture stores the first visible flight/day/month anchor instead of relying on document edges"
 );
 
 assert.match(
@@ -593,20 +635,20 @@ assert.match(
 
 assert.match(
   stylesSource,
-  /\.selected-panel-v114\s+\.history-flight-row-main\s*{[\s\S]*grid-template-columns:\s*56px\s+minmax\(0,\s*1fr\)\s+80px;[\s\S]*column-gap:\s*14px;[\s\S]*min-height:\s*84px;[\s\S]*padding:\s*12px\s+12px\s+12px\s+13px;/,
-  "history rows use a taller relaxed card rhythm with larger date-route spacing"
+  /\.selected-panel-v114\s+\.history-flight-row-main\s*{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);[\s\S]*gap:\s*10px;[\s\S]*min-height:\s*112px;[\s\S]*padding:\s*14px\s+13px\s+14px\s+15px;/,
+  "history rows remove the repeated date column and give the trip card more vertical space"
 );
 
 assert.match(
   stylesSource,
-  /\.selected-panel-v114\s+\.history-flight-airport-names\s*{[\s\S]*font-size:\s*12\.5px;[\s\S]*line-height:\s*1\.32;[\s\S]*\.selected-panel-v114\s+\.history-flight-times,[\s\S]*font-size:\s*11\.5px;[\s\S]*line-height:\s*1\.35;/,
-  "history rows reduce Chinese airport names while enlarging code and time metadata"
+  /\.selected-panel-v114\s+\.history-flight-route-cell\s*{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+82px\s+minmax\(0,\s*1fr\);[\s\S]*\.selected-panel-v114\s+\.history-flight-airport\s+strong\s*{[\s\S]*white-space:\s*normal;[\s\S]*word-break:\s*break-word;/,
+  "history rows give both airport names their own wrapping columns"
 );
 
 assert.match(
   stylesSource,
-  /\.selected-panel-v114\s+\.history-flight-date-cell\s+strong\s*{[\s\S]*font-size:\s*15px;[\s\S]*\.selected-panel-v114\s+\.history-flight-duration-cell\s+strong\s*{[\s\S]*font-size:\s*13px;[\s\S]*\.selected-panel-v114\s+\.history-flight-expanded\s*{[\s\S]*padding:\s*0\s+12px\s+13px\s+83px;/,
-  "history row date, duration, and expanded details are scaled up with the taller cards"
+  /\.selected-panel-v114\s+\.history-flight-time-pair\s*{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+30px\s+minmax\(0,\s*1fr\);[\s\S]*\.selected-panel-v114\s+\.history-flight-duration-cell\s+strong\s*{[\s\S]*font-size:\s*13px;[\s\S]*\.selected-panel-v114\s+\.history-flight-expanded\s*{[\s\S]*padding:\s*0\s+13px\s+14px\s+15px;/,
+  "history row paired times, center duration, and expanded details are scaled for the redesigned cards"
 );
 
 assert.match(

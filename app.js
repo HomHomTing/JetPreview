@@ -108,6 +108,9 @@ const mapWorldBounds = {
 const mapLoadingConfig = {
   viewportDebounceMs: appConfig.performance?.viewportDebounceMs ?? 360,
   viewportPaddingRatio: appConfig.performance?.viewportPaddingRatio ?? 0.25,
+  aircraftViewportPaddingRatio: appConfig.performance?.aircraftViewportPaddingRatio ?? 0.15,
+  viewportRefreshMinShiftRatio: appConfig.performance?.viewportRefreshMinShiftRatio ?? 0.18,
+  viewportRefreshMinZoomDelta: appConfig.performance?.viewportRefreshMinZoomDelta ?? 0.5,
   showAllAircraftIconsAtAllZooms: appConfig.performance?.showAllAircraftIconsAtAllZooms ?? true,
   allAircraftIconRequestLimit: appConfig.performance?.allAircraftIconRequestLimit ?? 50000,
   aircraftLimitByZoom: appConfig.performance?.aircraftLimitByZoom || [
@@ -158,7 +161,9 @@ const mapLoadingConfig = {
     normalMs: appConfig.performance?.aircraftRefresh?.normalMs ?? 4200,
     globalMs: appConfig.performance?.aircraftRefresh?.globalMs ?? 6500,
     airportMs: appConfig.performance?.aircraftRefresh?.airportMs ?? 3000,
-    hiddenMs: appConfig.performance?.aircraftRefresh?.hiddenMs ?? 22000,
+    hiddenMs: appConfig.performance?.aircraftRefresh?.hiddenMs ?? 60000,
+    hiddenPauseAfterMs: appConfig.performance?.aircraftRefresh?.hiddenPauseAfterMs ?? 300000,
+    resumeAirportDelayMs: appConfig.performance?.aircraftRefresh?.resumeAirportDelayMs ?? 6000,
     failureMinMs: appConfig.performance?.aircraftRefresh?.failureMinMs ?? 10000,
     failureMaxMs: appConfig.performance?.aircraftRefresh?.failureMaxMs ?? 30000,
     staleAfterMs: appConfig.performance?.aircraftRefresh?.staleAfterMs ?? 15000,
@@ -209,6 +214,8 @@ const historyTimelineConfig = {
   mountLimit: 40,
   pageSize: 120,
   maxPages: 5,
+  arrivalEnrichmentMax: 120,
+  arrivalEnrichmentConcurrency: 4,
   sampleRegistration: "B-8202"
 };
 const HISTORY_USER_SCROLL_SETTLE_MS = 6500;
@@ -843,13 +850,68 @@ function aircraftRenderIsLimited() {
 }
 
 function aircraftIconVisibilityUsesGlobalScope() {
-  return mapLoadingConfig.showAllAircraftIconsAtAllZooms;
+  return false;
 }
 
 function aircraftRequestBounds() {
-  return aircraftIconVisibilityUsesGlobalScope()
-    ? mapWorldBounds
-    : currentViewportBounds(mapLoadingConfig.viewportPaddingRatio);
+  return currentViewportBounds(mapLoadingConfig.aircraftViewportPaddingRatio);
+}
+
+function boundsLongitudeSpan(bounds) {
+  if (!bounds) {
+    return 360;
+  }
+  let span = Number(bounds.east) - Number(bounds.west);
+  if (span < 0) {
+    span += 360;
+  }
+  return Math.max(0.1, span);
+}
+
+function longitudeDistanceDegrees(a, b) {
+  return Math.abs(((Number(a) - Number(b) + 540) % 360) - 180);
+}
+
+function boundsCenterLongitude(bounds) {
+  const west = Number(bounds?.west);
+  const span = boundsLongitudeSpan(bounds);
+  return normalizeLongitude(west + span / 2);
+}
+
+function aircraftRequestViewSnapshot(bounds = aircraftRequestBounds()) {
+  return {
+    centerLat: (Number(bounds.north) + Number(bounds.south)) / 2,
+    centerLng: boundsCenterLongitude(bounds),
+    latSpan: Math.max(0.1, Number(bounds.north) - Number(bounds.south)),
+    lngSpan: boundsLongitudeSpan(bounds),
+    zoom: currentZoom()
+  };
+}
+
+function aircraftViewportRefreshIsMeaningful(reason, bounds = aircraftRequestBounds()) {
+  if (reason !== "viewport" || !state.lastRealtimeRequestView) {
+    return true;
+  }
+  if (!state.realtimeLoadedAt || state.dataStatus !== "live") {
+    return true;
+  }
+  const current = aircraftRequestViewSnapshot(bounds);
+  const previous = state.lastRealtimeRequestView;
+  if (Math.abs(current.zoom - previous.zoom) >= mapLoadingConfig.viewportRefreshMinZoomDelta) {
+    return true;
+  }
+  const latMove = Math.abs(current.centerLat - previous.centerLat);
+  const lngMove = longitudeDistanceDegrees(current.centerLng, previous.centerLng);
+  return latMove >= current.latSpan * mapLoadingConfig.viewportRefreshMinShiftRatio
+    || lngMove >= current.lngSpan * mapLoadingConfig.viewportRefreshMinShiftRatio;
+}
+
+function rememberAircraftRealtimeRequestView(bounds = aircraftRequestBounds()) {
+  state.lastRealtimeRequestView = aircraftRequestViewSnapshot(bounds);
+}
+
+function aircraftSinceVersionForRequest(reason) {
+  return reason === "timer" ? state.aircraftViewportVersion || "" : "";
 }
 
 function aircraftLabelLimit() {
@@ -1604,7 +1666,7 @@ function endAirportMarkerHover(id, event) {
 
 function normalizeAirportCodeText(value) {
   const text = String(value ?? "").trim().toUpperCase();
-  return !text || text === "-" || text === "N/A" ? "" : text;
+  return !text || text === "-" || text === "—" || text === "N/A" || text === NA_TEXT ? "" : text;
 }
 
 function airportCodeByLength(length, ...values) {
@@ -1979,15 +2041,15 @@ function cacheAirportGroundCount(airport) {
   if (!state?.airportGroundCountCache || !airport) {
     return;
   }
-  const badge = airportParkingBadgeModel(airport);
+  const count = airportParkingBadgeCount(airport);
   const key = airportGroundCountCacheKey(airport);
-  if (!key || !badge) {
+  if (!key || count === null) {
     return;
   }
   state.airportGroundCountCache.set(key, {
-    value: badge.count,
-    source: badge.source || "airport-model",
-    updatedAt: badge.updatedAt || Date.now()
+    value: count,
+    source: airportGroundCountSource(airport) || "airport-model",
+    updatedAt: airportGroundCountUpdatedAt(airport) || Date.now()
   });
 }
 
@@ -2499,10 +2561,20 @@ const state = {
   aircraftPanelRecords: new Map(),
   aircraftHistoryDetails: new Map(),
   airportDynamicDetails: new Map(),
+  airportDailyFlightDetails: new Map(),
+  airportDailyFlightLoads: new Map(),
   airportGroundDetails: new Map(),
   airportGroundCountCache: new Map(),
   airportMovementDiscovery: new Map(),
   airportMovementHistory: new Map(),
+  airportMovementHistoryIndex: new Map(),
+  airportDynamicJourneyLoads: new Map(),
+  airportMovementProfileLoads: new Map(),
+  airportDynamicVisibleLimits: new Map(),
+  airportDynamicRenderTimers: new Map(),
+  airportDynamicSupplementLoads: new Map(),
+  airportDynamicExpandedMovementKey: "",
+  airportMovementRowDetailLoads: new Map(),
   iconTypeCodeProfiles: {
     queue: [],
     queuedKeys: new Set(),
@@ -2521,8 +2593,10 @@ const state = {
     status: "all",
     airportQuery: "",
     anchorMonth: "",
+    anchorDay: "",
     expandedKey: "",
     highlightMonth: "",
+    highlightDay: "",
     summaryCollapsed: false,
     overviewExpanded: false,
     scrollResetToken: 0,
@@ -2558,6 +2632,9 @@ const state = {
   refreshBackoffMs: 0,
   viewportRequestSeq: 0,
   pendingViewportReason: "",
+  lastRealtimeRequestView: null,
+  pageHiddenAt: 0,
+  needsResumeRefresh: false,
   isInteractingWithMap: false,
   layoutProfile: "desktop",
   mapInteractionPhase: "idle",
@@ -2723,6 +2800,7 @@ function renderViewportLightDuringInteraction() {
   renderAircraft();
   syncSelectedRouteVisuals();
   updateRouteLegend();
+  updateMapScaleControl();
 }
 
 function scheduleTabletInteractionRender() {
@@ -2771,7 +2849,6 @@ class LeafletMapEngine {
       preferCanvas: true
     }).setView(defaultMapCenter(), defaultZoom());
     this.addLocalBasemap();
-    L.control.scale({ position: "bottomright", metric: true, imperial: false }).addTo(this.map);
   }
 
   addLocalBasemap() {
@@ -4997,9 +5074,7 @@ function aircraftForCurrentView() {
       : cachedAircraft;
     return applyAircraftLabelCollision(mergeProtectedAircraft(rendered, protectedAircraft));
   }
-  const bounds = aircraftIconVisibilityUsesGlobalScope()
-    ? null
-    : currentViewportBounds(mapLoadingConfig.viewportPaddingRatio);
+  const bounds = currentViewportBounds(mapLoadingConfig.aircraftViewportPaddingRatio);
   const limit = aircraftRenderLimit();
   const inView = [];
 
@@ -5011,7 +5086,7 @@ function aircraftForCurrentView() {
     if (aircraftIsExpired(jet)) {
       return;
     }
-    if (!bounds || positionInBounds(position, bounds) || protectedIds.has(jet.id)) {
+    if (positionInBounds(position, bounds) || protectedIds.has(jet.id)) {
       inView.push(jet);
     }
   });
@@ -6283,24 +6358,17 @@ function airportsForCurrentView() {
   }
   const bounds = currentViewportBounds(mapLoadingConfig.viewportPaddingRatio);
   const maxLevel = airportLevelLimit();
-  const maxMarkers = airportRenderLimit();
-  const inView = airports
+  const rendered = airports
     .filter((airport) => positionInBounds([airport.lat, airport.lng], bounds))
     .map((airport) => normalizeAirportRecord(airport))
     .map((airport) => ({
       airport,
       level: airportPriorityLevel(airport),
-      protected: airportIsProtected(airport, protectedIds),
-      point: state.map.project ? state.map.project([airport.lat, airport.lng]) : null
+      protected: airportIsProtected(airport, protectedIds)
     }))
-    .filter((item) => (item.protected || item.level <= maxLevel) && airportMarkerIsVisible(item.airport))
-    .sort((a, b) => Number(b.protected) - Number(a.protected)
-      || a.level - b.level
-      || airportDistanceSortScore(a, state.map.project ? state.map.project(currentMapCenter()) : null)
-      - airportDistanceSortScore(b, state.map.project ? state.map.project(currentMapCenter()) : null));
-  const rendered = Number.isFinite(maxMarkers)
-    ? inView.slice(0, maxMarkers).map((item) => item.airport)
-    : inView.map((item) => item.airport);
+    .filter((item) => item.protected || item.level <= maxLevel)
+    .map((item) => item.airport)
+    .filter(airportMarkerIsVisible);
   addProtectedAirports(rendered, protectedIds);
   return applyAirportLabelCollision(rendered);
 }
@@ -7240,6 +7308,15 @@ function cacheAirportDynamicDetail(airport, detail) {
     .forEach((key) => state.airportDynamicDetails.set(normalizedLookupKey(key), detail));
 }
 
+function cacheAirportDailyFlightsDetail(airport, detail) {
+  if (!airport || !detail) {
+    return;
+  }
+  [airport.id, airport.iata, airport.airportCode, airport.icaoCode, detail.airportCode]
+    .filter((value) => !missingValue(value))
+    .forEach((key) => state.airportDailyFlightDetails.set(normalizedLookupKey(key), detail));
+}
+
 function cacheAirportGroundDetail(airport, detail) {
   if (!airport || !detail) {
     return;
@@ -7256,6 +7333,14 @@ function applyAirportDynamic(airport, detail) {
   airport.apiDynamic = detail;
   cacheAirportDynamicDetail(airport, detail);
   applyAirportPanelUpdates(airport, detail);
+}
+
+function applyAirportDailyFlights(airport, detail) {
+  if (!airport || !detail) {
+    return;
+  }
+  airport.apiDailyFlights = detail;
+  cacheAirportDailyFlightsDetail(airport, detail);
 }
 
 function applyAirportGround(airport, detail) {
@@ -7285,6 +7370,9 @@ function replaceAirportData(nextAirports) {
     }
     if (existing?.apiDynamic) {
       applyAirportDynamic(airport, existing.apiDynamic);
+    }
+    if (existing?.apiDailyFlights) {
+      applyAirportDailyFlights(airport, existing.apiDailyFlights);
     }
     if (existing?.apiGround) {
       applyAirportGround(airport, existing.apiGround);
@@ -7331,6 +7419,7 @@ function renderViewport() {
   renderAircraft();
   syncSelectedRouteVisuals();
   updateRouteLegend();
+  updateMapScaleControl();
   updateRail();
 }
 
@@ -7368,6 +7457,8 @@ function buildAirportViewportRequest(reason = "timer") {
     airportLayerMode: airportLayerMode(),
     maxAirports: airportRequestLimit(),
     displayLevelMax: airportRequestLevelLimit(),
+    includeGroundCount: true,
+    includeAirportDetail: false,
     includeAllAirports: airportShowsAllInCurrentViewport(),
     includeLabels: !suppressTabletLabels && state.labels && Number.isFinite(scaleKm)
       && scaleKm <= mapLoadingConfig.airportCodeLabelScaleKm,
@@ -7375,7 +7466,7 @@ function buildAirportViewportRequest(reason = "timer") {
     mapInteractionPhase: state.mapInteractionPhase,
     selectedAirportCode: selected?.icaoCode || selected?.id || selected?.iata || "",
     protectedAirportCodes: protectedCodes,
-    businessJetOnly: false,
+    businessJetOnly: true,
     includeAirports: true,
     includeAircraft: false,
     reason
@@ -7395,6 +7486,8 @@ function buildAirportViewportRequestMetadata() {
     displayLevelMax: request.displayLevelMax,
     effectiveScaleKm: request.effectiveScaleKm,
     scaleBand: request.scaleBand,
+    includeGroundCount: request.includeGroundCount,
+    includeAirportDetail: request.includeAirportDetail,
     includeAllAirports: request.includeAllAirports,
     includeLabels: request.includeLabels,
     clientProfile: request.clientProfile,
@@ -7405,29 +7498,32 @@ function buildAirportViewportRequestMetadata() {
   };
 }
 
-function buildAircraftViewportRequest(reason = "timer") {
-  const bounds = aircraftRequestBounds();
+function buildAircraftViewportRequest(reason = "timer", bounds = aircraftRequestBounds()) {
   const selectedCandidate = selectedAircraft();
   const selected = aircraftIsPanelOnly(selectedCandidate) ? null : selectedCandidate;
   const protectedAircraft = protectedAircraftForRendering(selected);
+  const requestTier = selected ? "selected-live" : "visible-live";
   return {
     north: roundedCoordinate(bounds.north),
     south: roundedCoordinate(bounds.south),
     west: roundedCoordinate(bounds.west),
     east: roundedCoordinate(bounds.east),
     zoom: Math.round(currentZoom() * 100) / 100,
-    viewportPaddingRatio: aircraftIconVisibilityUsesGlobalScope() ? 0 : mapLoadingConfig.viewportPaddingRatio,
-    aircraftScope: aircraftIconVisibilityUsesGlobalScope() ? "global" : "viewport",
+    viewportPaddingRatio: mapLoadingConfig.aircraftViewportPaddingRatio,
+    aircraftScope: "viewport",
+    requestTier,
+    payloadMode: "minimal",
+    fields: "map",
     aircraftLimit: aircraftRequestLimit(),
     clientProfile: state.layoutProfile,
     mapInteractionPhase: state.mapInteractionPhase,
     aircraftCategory: "business_jet",
     categories: "J",
     includeAircraft: true,
-    includeAirports: true,
+    includeAirports: false,
     ...buildAirportViewportRequestMetadata(),
     includeGround: mapLoadingConfig.showAllAircraftIconsAtAllZooms || currentZoom() >= 8.5,
-    sinceVersion: state.aircraftViewportVersion || "",
+    sinceVersion: aircraftSinceVersionForRequest(reason),
     selectedUniqueKey: selected?.uniqueKey || selected?.id || "",
     pinnedAircraftKeys: protectedAircraft
       .map((jet) => jet.uniqueKey || jet.id)
@@ -7450,15 +7546,13 @@ function updateAircraftViewportStatsFromCache() {
     state.aircraftTruncated = aircraftRenderIsLimited() && matched > aircraftRenderLimit();
     return;
   }
-  const bounds = aircraftIconVisibilityUsesGlobalScope()
-    ? null
-    : currentViewportBounds(mapLoadingConfig.viewportPaddingRatio);
+  const bounds = currentViewportBounds(mapLoadingConfig.aircraftViewportPaddingRatio);
   const selected = selectedAircraft();
   const matched = businessJets.filter((jet) => {
     if (!aircraftPassesLockedFilter(jet) || aircraftIsExpired(jet)) {
       return false;
     }
-    return !bounds || positionInBounds(currentPosition(jet), bounds) || jet.id === selected?.id;
+    return positionInBounds(currentPosition(jet), bounds) || jet.id === selected?.id;
   }).length;
   state.aircraftTotalMatched = matched;
   state.aircraftTruncated = aircraftRenderIsLimited() && matched > aircraftRenderLimit();
@@ -7584,6 +7678,55 @@ function applyRealtimeSnapshot(snapshot) {
   state.refreshBackoffMs = 0;
 }
 
+function pageHiddenDurationMs(now = Date.now()) {
+  return document.hidden && state.pageHiddenAt
+    ? Math.max(0, now - state.pageHiddenAt)
+    : 0;
+}
+
+function pageHiddenRefreshPaused(now = Date.now()) {
+  return document.hidden
+    && pageHiddenDurationMs(now) >= mapLoadingConfig.aircraftRefresh.hiddenPauseAfterMs;
+}
+
+function invalidateRealtimeRequestQueue() {
+  state.viewportRequestSeq += 1;
+  state.pendingViewportReason = "";
+}
+
+function enterHiddenRefreshMode() {
+  state.pageHiddenAt = state.pageHiddenAt || Date.now();
+  state.needsResumeRefresh = true;
+  invalidateRealtimeRequestQueue();
+  scheduleNextRealtimeRefresh();
+  scheduleNextAirportRefresh();
+}
+
+function airportSnapshotRefreshDue(now = Date.now()) {
+  return !state.airportLoadedAt
+    || (airportSnapshotRefreshMs && now - Number(state.airportLoadedAt) >= airportSnapshotRefreshMs);
+}
+
+function resumeVisibleRefresh() {
+  const wasHidden = Boolean(state.pageHiddenAt || state.needsResumeRefresh);
+  state.pageHiddenAt = 0;
+  state.needsResumeRefresh = false;
+  state.pendingViewportReason = "";
+  window.clearTimeout(state.refreshTimer);
+  window.clearTimeout(state.airportRefreshTimer);
+  state.refreshTimer = null;
+  state.airportRefreshTimer = null;
+  refreshRealtimeData(wasHidden ? "resume-visible" : "visible");
+  if (airportSnapshotRefreshMs && airportSnapshotRefreshDue()) {
+    state.airportRefreshTimer = window.setTimeout(
+      () => refreshAirportData(wasHidden ? "resume-visible" : "visible"),
+      mapLoadingConfig.aircraftRefresh.resumeAirportDelayMs
+    );
+  } else {
+    scheduleNextAirportRefresh();
+  }
+}
+
 function aircraftRefreshIntervalMs(useBackoff = true) {
   const refresh = mapLoadingConfig.aircraftRefresh;
   if (document.hidden) {
@@ -7611,6 +7754,14 @@ function scheduleNextRealtimeRefresh() {
   if (!dataService?.isEnabled() || journeyHistoryPanelIsOpen()) {
     return;
   }
+  if (document.hidden && !state.pageHiddenAt) {
+    state.pageHiddenAt = Date.now();
+    state.needsResumeRefresh = true;
+  }
+  if (pageHiddenRefreshPaused()) {
+    state.needsResumeRefresh = true;
+    return;
+  }
   state.refreshTimer = window.setTimeout(() => refreshRealtimeData("timer"), aircraftRefreshIntervalMs());
 }
 
@@ -7618,6 +7769,11 @@ function scheduleNextAirportRefresh() {
   window.clearTimeout(state.airportRefreshTimer);
   state.airportRefreshTimer = null;
   if (!dataService?.isEnabled() || !airportSnapshotRefreshMs || journeyHistoryPanelIsOpen()) {
+    return;
+  }
+  if (document.hidden) {
+    state.pageHiddenAt = state.pageHiddenAt || Date.now();
+    state.needsResumeRefresh = true;
     return;
   }
   state.airportRefreshTimer = window.setTimeout(() => refreshAirportData("timer"), airportSnapshotRefreshMs);
@@ -7634,6 +7790,11 @@ async function refreshAirportData(reason = "timer") {
   }
   if (journeyHistoryPanelIsOpen()) {
     pausePageDataRefreshForJourneyHistory();
+    return;
+  }
+  if (document.hidden) {
+    state.needsResumeRefresh = true;
+    scheduleNextAirportRefresh();
     return;
   }
   if (tabletLayoutProfile() && state.isInteractingWithMap && reason === "timer") {
@@ -7688,7 +7849,21 @@ async function refreshRealtimeData(reason = "timer") {
     pausePageDataRefreshForJourneyHistory();
     return;
   }
+  if (document.hidden && !state.pageHiddenAt) {
+    state.pageHiddenAt = Date.now();
+    state.needsResumeRefresh = true;
+  }
+  if (pageHiddenRefreshPaused()) {
+    state.needsResumeRefresh = true;
+    return;
+  }
   if (state.isInteractingWithMap && reason === "timer") {
+    scheduleNextRealtimeRefresh();
+    return;
+  }
+  const requestBounds = aircraftRequestBounds();
+  if (!aircraftViewportRefreshIsMeaningful(reason, requestBounds)) {
+    renderViewport();
     scheduleNextRealtimeRefresh();
     return;
   }
@@ -7701,7 +7876,8 @@ async function refreshRealtimeData(reason = "timer") {
   state.realtimeLoading = true;
   updateDataSourceLabels();
   try {
-    const snapshot = await dataService.getRealtimeSnapshot(buildAircraftViewportRequest(reason));
+    rememberAircraftRealtimeRequestView(requestBounds);
+    const snapshot = await dataService.getRealtimeSnapshot(buildAircraftViewportRequest(reason, requestBounds));
     if (journeyHistoryPanelIsOpen()) {
       pausePageDataRefreshForJourneyHistory();
       return;
@@ -8005,9 +8181,19 @@ async function loadAircraftHistory(jet, options = {}) {
     : { preserveScroll: true };
   let historyPanelRendered = false;
   const historyTailNo = aircraftHistoryRequestTailNo(jet);
-  if (!dataService?.isEnabled() || !historyTailNo) {
+  if (!dataService?.isEnabled()) {
     applyStaticAircraftHistory(jet);
     renderRecentFlights(jet, renderOptions);
+    if (options.resetScroll) {
+      finishHistoryScrollReset(options.resetToken);
+    }
+    return;
+  }
+  if (!historyTailNo) {
+    if (aircraftDetailIsLoading(jet) || aircraftNeedsDetailLoad(jet)) {
+      loadAircraftDetails(jet);
+    }
+    setRecentFlightsHtml(`<p class="empty-related">行程记录等待飞机信息同步...</p>`, renderOptions);
     if (options.resetScroll) {
       finishHistoryScrollReset(options.resetToken);
     }
@@ -8122,6 +8308,135 @@ function mergeFlightHistoryDetails(base, next) {
   };
 }
 
+function historyTimeRefIsDurationFallback(ref) {
+  return String(ref?.sourceField || "").includes("depTime1+estimateTime");
+}
+
+function historyFlightArrivalNeedsEnrichment(item) {
+  const primary = historyPrimaryArrival(item);
+  return !Number.isFinite(Number(primary?.epochMs)) || historyTimeRefIsDurationFallback(primary);
+}
+
+function historyTrackEnrichmentKey(item) {
+  const uniqueKey = firstMatchedValue(item?.uniqueKey, item?.flightUniqueKey);
+  return missingValue(uniqueKey) ? "" : String(uniqueKey).trim();
+}
+
+function historyTrackTimeRef(detail, key) {
+  const ref = detail?.timeRefs?.[key];
+  return ref && typeof ref === "object" ? ref : null;
+}
+
+function historyTrackTimeRefWithSource(ref, key) {
+  if (!ref || !Number.isFinite(Number(ref.epochMs))) {
+    return null;
+  }
+  const sourceField = String(ref.sourceField || key);
+  return {
+    ...ref,
+    sourceField: sourceField.startsWith("513009.") ? sourceField : `513009.${sourceField}`,
+    semantic: ref.semantic ? `history_${ref.semantic}` : `history_${key}`,
+    confidence: ref.confidence || "track-enriched"
+  };
+}
+
+function mergeHistoryFlightTimeRefFromTrack(flight, key, trackRef) {
+  const incoming = historyTrackTimeRefWithSource(trackRef, key);
+  if (!incoming) {
+    return false;
+  }
+  const current = historyTimeRef(flight, key);
+  if (Number.isFinite(Number(current?.epochMs)) && !historyTimeRefIsDurationFallback(current)) {
+    return false;
+  }
+  flight.times = {
+    ...(flight.times || {}),
+    [key]: incoming
+  };
+  return true;
+}
+
+function applyFlightTrackTimesToHistoryFlight(flight, detail) {
+  if (!flight || !detail) {
+    return false;
+  }
+  let changed = false;
+  changed = mergeHistoryFlightTimeRefFromTrack(flight, "actualArrival", historyTrackTimeRef(detail, "actualArrival")) || changed;
+  changed = mergeHistoryFlightTimeRefFromTrack(flight, "estimatedArrival", historyTrackTimeRef(detail, "estimatedArrival")) || changed;
+  changed = mergeHistoryFlightTimeRefFromTrack(flight, "scheduledArrival", historyTrackTimeRef(detail, "scheduledArrival")) || changed;
+  changed = mergeHistoryFlightTimeRefFromTrack(flight, "actualDeparture", historyTrackTimeRef(detail, "actualDeparture")) || changed;
+  changed = mergeHistoryFlightTimeRefFromTrack(flight, "scheduledDeparture", historyTrackTimeRef(detail, "scheduledDeparture")) || changed;
+  if (!changed) {
+    return false;
+  }
+  const depRef = historyPrimaryDeparture(flight);
+  const arrRef = historyPrimaryArrival(flight);
+  if (Number.isFinite(Number(depRef?.epochMs))) {
+    flight.depTimeRef = depRef;
+    flight.depActualEpochMs = depRef.epochMs;
+  }
+  if (Number.isFinite(Number(arrRef?.epochMs))) {
+    flight.arrTimeRef = arrRef;
+    flight.arrActualEpochMs = arrRef.epochMs;
+  }
+  if (detail.arrivalAirport && (!flight.arrAirportName || flight.arrAirportName === NA_TEXT)) {
+    flight.arrAirportName = firstMatchedValue(detail.arrivalAirport.airportFourName, detail.arrivalAirport.airportName, detail.arrivalAirport.name, flight.arrAirportName);
+    flight.arrAirportFullName = firstMatchedValue(detail.arrivalAirport.airportName, detail.arrivalAirport.name, flight.arrAirportFullName);
+  }
+  if (detail.departureAirport && (!flight.depAirportName || flight.depAirportName === NA_TEXT)) {
+    flight.depAirportName = firstMatchedValue(detail.departureAirport.airportFourName, detail.departureAirport.airportName, detail.departureAirport.name, flight.depAirportName);
+    flight.depAirportFullName = firstMatchedValue(detail.departureAirport.airportName, detail.departureAirport.name, flight.depAirportFullName);
+  }
+  flight.historyArrivalEnrichedFrom = "513009";
+  return true;
+}
+
+function historyArrivalEnrichmentCandidates(detail) {
+  const seen = new Set();
+  return (Array.isArray(detail?.flights) ? detail.flights : [])
+    .filter((flight) => historyFlightArrivalNeedsEnrichment(flight) && historyTrackEnrichmentKey(flight))
+    .filter((flight) => {
+      const key = historyTrackEnrichmentKey(flight);
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    })
+    .slice(0, historyTimelineConfig.arrivalEnrichmentMax);
+}
+
+async function enrichFlightHistoryArrivalsFromTracks(detail, options = {}) {
+  if (!detail || !dataService?.isEnabled()) {
+    return detail;
+  }
+  const maxCandidates = Number.isFinite(Number(options.maxCandidates))
+    ? Math.max(0, Number(options.maxCandidates))
+    : historyTimelineConfig.arrivalEnrichmentMax;
+  const candidates = historyArrivalEnrichmentCandidates(detail).slice(0, maxCandidates);
+  if (!candidates.length) {
+    return detail;
+  }
+  let changedCount = 0;
+  const concurrency = Math.max(1, Number(options.concurrency || historyTimelineConfig.arrivalEnrichmentConcurrency) || 1);
+  for (let index = 0; index < candidates.length; index += concurrency) {
+    const batch = candidates.slice(index, index + concurrency);
+    const results = await Promise.allSettled(batch.map(async (flight) => {
+      const uniqueKey = historyTrackEnrichmentKey(flight);
+      const trackDetail = uniqueKey ? await dataService.getFlightTrack(uniqueKey) : null;
+      return applyFlightTrackTimesToHistoryFlight(flight, trackDetail);
+    }));
+    changedCount += results.filter((result) => result.status === "fulfilled" && result.value).length;
+  }
+  if (changedCount) {
+    detail.arrivalEnrichedFrom = "513009";
+    detail.arrivalEnrichedCount = (Number(detail.arrivalEnrichedCount) || 0) + changedCount;
+    detail.flights = detail.flights.slice().sort((a, b) => historyComparableEpoch(b) - historyComparableEpoch(a));
+    detail.totalMinutes = detail.flights.reduce((sum, item) => sum + (historyDurationMinutes(item) || 0), 0);
+  }
+  return detail;
+}
+
 async function fetchAircraftHistoryDetail(tailNoEncrypted) {
   let merged = null;
   let page = 1;
@@ -8143,7 +8458,7 @@ async function fetchAircraftHistoryDetail(tailNoEncrypted) {
     }
     page = nextPage;
   }
-  return merged;
+  return enrichFlightHistoryArrivalsFromTracks(merged);
 }
 
 function createEmptyAircraftHistoryDetail() {
@@ -8159,6 +8474,112 @@ function createEmptyAircraftHistoryDetail() {
     flights: [],
     groundAirportInfo: null
   };
+}
+
+function airportDailyFlightsRequestCode(airport) {
+  const info = mergePresentFields(airport?.apiDynamic?.airportInfo, airport?.apiDetail?.airportInfo, airport?.apiGround?.airportInfo);
+  const code = firstAirportCodeByLength(3, info.airportCode, airport?.airportCode, airport?.iata);
+  return code === NA_TEXT ? "" : code;
+}
+
+function airportDailyFlightsLocalDate(airport) {
+  const date = String(airportBoardLocalDate(airport) || "").trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : "";
+}
+
+function airportDailyFlightsLoadKey(airport) {
+  const airportCode = airportDailyFlightsRequestCode(airport);
+  const localDate = airportDailyFlightsLocalDate(airport);
+  return airportCode && localDate ? `airport:${airportCode}:${localDate}:daily-flights` : "";
+}
+
+function airportDailyFlightsNeedLoad(airport) {
+  const airportCode = airportDailyFlightsRequestCode(airport);
+  const localDate = airportDailyFlightsLocalDate(airport);
+  return Boolean(airportCode && localDate && (!airport?.apiDailyFlights || airport.apiDailyFlights.localDate !== localDate));
+}
+
+function airportDailyFlightsReady(airport) {
+  const localDate = airportDailyFlightsLocalDate(airport);
+  return Boolean(
+    localDate
+    && airport?.apiDailyFlights
+    && airport.apiDailyFlights.localDate === localDate
+    && Array.isArray(airport.apiDailyFlights.flights)
+  );
+}
+
+function airportDailyFlightsIsWaiting(airport) {
+  return Boolean(dataService?.isEnabled()
+    && airportDailyFlightsNeedLoad(airport)
+    && !airport?.airportDailyFlightsError);
+}
+
+function airportDailyFlightsIsLoading(airport) {
+  const loadKey = airportDailyFlightsLoadKey(airport);
+  return Boolean(loadKey && state.detailLoads.has(loadKey));
+}
+
+async function loadAirportDailyFlights(airport, options = {}) {
+  if (!dataService?.isEnabled() || !airport || !airportDailyFlightsNeedLoad(airport)) {
+    return airport?.apiDailyFlights || null;
+  }
+  const airportCode = airportDailyFlightsRequestCode(airport);
+  const localDate = airportDailyFlightsLocalDate(airport);
+  if (!airportCode || !localDate) {
+    return null;
+  }
+  const loadKey = airportDailyFlightsLoadKey(airport);
+  if (!loadKey) {
+    return null;
+  }
+  const existing = state.airportDailyFlightLoads.get(loadKey);
+  if (existing?.pending) {
+    return existing.pending;
+  }
+  state.detailLoads.add(loadKey);
+  const shouldRender = options.render !== false;
+  const pending = (async () => {
+    try {
+      const detail = await dataService.getAirportDailyFlights(airportCode, localDate);
+      const currentAirport = airportById(airport.id);
+      if (!currentAirport || !detail) {
+        return detail || null;
+      }
+      applyAirportDailyFlights(currentAirport, detail);
+      state.airportDailyFlightLoads.set(loadKey, {
+        loadedAt: Date.now(),
+        ok: true
+      });
+      if (shouldRender && state.selectedKind === "airport" && state.selectedId === currentAirport.id && state.airportSegment === "dynamic") {
+        renderAirportDynamicPanel(currentAirport);
+      }
+      renderApiDebugConsole();
+      return detail;
+    } catch (error) {
+      const currentAirport = airportById(airport.id);
+      if (currentAirport) {
+        currentAirport.airportDailyFlightsError = error;
+        state.airportDailyFlightLoads.set(loadKey, {
+          loadedAt: Date.now(),
+          ok: false,
+          error
+        });
+        if (shouldRender && state.selectedKind === "airport" && state.selectedId === currentAirport.id && state.airportSegment === "dynamic") {
+          renderAirportDynamicPanel(currentAirport);
+        }
+        renderApiDebugConsole();
+      }
+      return null;
+    } finally {
+      state.detailLoads.delete(loadKey);
+    }
+  })();
+  state.airportDailyFlightLoads.set(loadKey, {
+    pending,
+    startedAt: Date.now()
+  });
+  return pending;
 }
 
 async function loadAirportDetail(airport) {
@@ -8246,9 +8667,6 @@ async function loadAirportGround(airport) {
     applyAirportGround(currentAirport, detail);
     if (state.selectedKind === "airport" && state.selectedId === currentAirport.id) {
       renderAirportDetailPanel(currentAirport);
-      if (state.airportSegment === "dynamic") {
-        discoverAirportMovementHistory(currentAirport);
-      }
     }
     renderApiDebugConsole();
   } catch (error) {
@@ -8354,9 +8772,9 @@ function setAirportSegment(segment) {
       if (state.airportTab !== "arrivals" && state.airportTab !== "departures") {
         state.airportDynamicFilter = "all";
       }
+      resetAirportDynamicVisibleLimit(airport, state.airportDynamicFilter);
+      loadAirportDynamicJourneyOnce(airport);
       renderAirportDynamicPanel(airport);
-      discoverAirportMovementDetails(airport);
-      discoverAirportMovementHistory(airport);
     } else if (state.airportSegment === "operations") {
       renderAirportOperationsPanel(airport);
     } else if (state.airportSegment === "airport") {
@@ -8812,6 +9230,9 @@ function maybeLoadApiDebugSelectionDetails(options = {}) {
       return;
     }
     loadAirportDetail(airport);
+    if (state.airportSegment === "dynamic") {
+      loadAirportDynamicJourneyOnce(airport);
+    }
     if (options.force || !airport.apiGround) {
       loadAirportGround(airport);
     }
@@ -9173,8 +9594,136 @@ function apiDebugAirportSummary(airport) {
     detailLoaded: {
       "513010": Boolean(airport.apiDetail),
       "513014": Boolean(airport.apiGround),
-      "513015": Boolean(airport.apiDynamic)
+      "513015": Boolean(airport.apiDynamic),
+      "513016": Boolean(airport.apiDailyFlights)
     }
+  };
+}
+
+function apiDebugMovementDirectionCount(rows = []) {
+  return rows.reduce((counts, item) => {
+    const direction = item?.direction === "departures" ? "departures" : item?.direction === "arrivals" ? "arrivals" : "unknown";
+    counts[direction] = (counts[direction] || 0) + 1;
+    counts.all += 1;
+    return counts;
+  }, { all: 0, arrivals: 0, departures: 0, unknown: 0 });
+}
+
+function apiDebugMovementRawListSources(value) {
+  const sources = [];
+  const seenRows = new Set();
+  const seenOwners = new Set();
+  const addSource = (rows, path, direction = "") => {
+    if (!Array.isArray(rows) || seenRows.has(rows)) {
+      return;
+    }
+    seenRows.add(rows);
+    sources.push({
+      path,
+      direction: direction || "auto",
+      count: rows.length,
+      rows
+    });
+  };
+  const walkOwner = (owner, path = "root", depth = 0) => {
+    if (!owner || typeof owner !== "object" || seenOwners.has(owner) || depth > 5) {
+      return;
+    }
+    if (Array.isArray(owner)) {
+      addSource(owner, path, "");
+      return;
+    }
+    seenOwners.add(owner);
+    airportMovementGeneralListKeys.forEach((key) => addSource(owner[key], `${path}.${key}`, ""));
+    airportMovementArrivalListKeys.forEach((key) => addSource(owner[key], `${path}.${key}`, "arrivals"));
+    airportMovementDepartureListKeys.forEach((key) => addSource(owner[key], `${path}.${key}`, "departures"));
+    airportMovementOwnerKeys.forEach((key) => walkOwner(owner[key], `${path}.${key}`, depth + 1));
+  };
+  walkOwner(value);
+  return sources;
+}
+
+function apiDebugAirportRawMovementLists(detail) {
+  const sources = apiDebugMovementRawListSources(detail?.raw || null);
+  return {
+    sourcePid: detail?.sourcePid || detail?.source || "513016",
+    airportCode: detail?.airportCode || "",
+    localDate: detail?.localDate || detail?.date || "",
+    sourceCount: sources.length,
+    totalRows: sources.reduce((sum, source) => sum + source.count, 0),
+    sources
+  };
+}
+
+function apiDebugMovementItemRow(item = {}) {
+  return {
+    source: item.source || "",
+    direction: item.direction || "",
+    status: item.status?.label || item.status?.key || "",
+    registration: firstMatchedValue(item.registration, item.callsign, ""),
+    callsign: firstMatchedValue(item.callsign, ""),
+    fromCode: item.fromCode || "",
+    toCode: item.toCode || "",
+    departure: item.actualDepartureRef?.raw || item.departure || "",
+    arrival: item.actualArrivalRef?.raw || item.arrival || "",
+    model: item.model || ""
+  };
+}
+
+function airportMovementDisplayCounts(modelOrStats = {}) {
+  const stats = modelOrStats.stats || modelOrStats;
+  const counts = stats.filterCounts || stats.loaded || {};
+  return {
+    all: Number.isFinite(Number(counts.all)) ? Number(counts.all) : 0,
+    arrivals: Number.isFinite(Number(counts.arrivals)) ? Number(counts.arrivals) : 0,
+    departures: Number.isFinite(Number(counts.departures)) ? Number(counts.departures) : 0
+  };
+}
+
+function renderAirportMovementKpiCounts(airport, model = airportMovementPanelBoardModel(airport)) {
+  const movementCounts = airportMovementDisplayCounts(model);
+  setText("airportSorties", movementCounts.all);
+  setText("airportInbound", movementCounts.arrivals);
+  setText("airportOutbound", movementCounts.departures);
+}
+
+function airportMovementPanelBoardModel(airport) {
+  const waitingForJourney = airportDynamicJourneyIsWaitingForInitialRows(airport);
+  return airportMovementBoardModel(airport, { waitForDaily: waitingForJourney });
+}
+
+function apiDebugAirportMovementAudit(airport) {
+  const model = airportMovementPanelBoardModel(airport);
+  const displayRows = model.items || [];
+  const dailyRows = airportDailyInterfaceItems(airport);
+  const boardRows = airportRelatedFlightItems(airport);
+  const visibleRows = {
+    all: airportMovementVisibleItemsForFilter(airport, displayRows, "all").map(apiDebugMovementItemRow),
+    arrivals: airportMovementVisibleItemsForFilter(airport, displayRows, "arrivals").map(apiDebugMovementItemRow),
+    departures: airportMovementVisibleItemsForFilter(airport, displayRows, "departures").map(apiDebugMovementItemRow)
+  };
+  const adaptedBoardRows = {
+    all: airportMovementVisibleItemsForFilter(airport, boardRows, "all").map(apiDebugMovementItemRow),
+    arrivals: airportMovementVisibleItemsForFilter(airport, boardRows, "arrivals").map(apiDebugMovementItemRow),
+    departures: airportMovementVisibleItemsForFilter(airport, boardRows, "departures").map(apiDebugMovementItemRow)
+  };
+  return {
+    panelAndFilterCounts: airportMovementDisplayCounts(model),
+    loadedCounts: model.stats.loaded,
+    missingCounts: model.stats.missing,
+    apiSummaryCounts: {
+      sorties: model.stats.sorties,
+      actual: model.stats.actual,
+      planned: model.stats.planned,
+      cancel: model.stats.cancel,
+      other: model.stats.other
+    },
+    dailyAdaptedCounts: apiDebugMovementDirectionCount(dailyRows),
+    displayRowCounts: apiDebugMovementDirectionCount(displayRows),
+    boardAdaptedCounts: apiDebugMovementDirectionCount(boardRows),
+    rawDailyList: apiDebugAirportRawMovementLists(airport?.apiDailyFlights || null),
+    visibleRows,
+    adaptedBoardRows
   };
 }
 
@@ -9228,6 +9777,8 @@ function selectedApiDebugSections() {
     if (!airport) {
       return [];
     }
+    const dailyMovementRawLists = apiDebugAirportRawMovementLists(airport.apiDailyFlights);
+    const dailyMovementAudit = apiDebugAirportMovementAudit(airport);
     return [
       {
         pid: "513008",
@@ -9256,6 +9807,21 @@ function selectedApiDebugSections() {
         request: { airportCode: airport.airportCode || airport.iata || "" },
         raw: airport.apiDynamic?.raw || null,
         adapted: apiDebugWithoutRaw(airport.apiDynamic)
+      },
+      {
+        pid: "513016",
+        title: "机场今日运行记录",
+        request: {
+          airportCode: airportDailyFlightsRequestCode(airport),
+          localDate: airportDailyFlightsLocalDate(airport)
+        },
+        raw: airport.apiDailyFlights?.raw || null,
+        rawMovementLists: dailyMovementRawLists,
+        movementAudit: dailyMovementAudit,
+        adapted: {
+          ...apiDebugWithoutRaw(airport.apiDailyFlights),
+          movementAudit: dailyMovementAudit
+        }
       }
     ];
   }
@@ -9300,6 +9866,18 @@ function renderApiDebugSection(section) {
       </div>
       ${renderApiDebugCallsignReport(callsignReport)}
       ${loaded ? `
+        ${section.movementAudit ? `
+          <details open>
+            <summary>计数核验</summary>
+            <pre>${escapeHtml(apiDebugJson(section.movementAudit))}</pre>
+          </details>
+        ` : ""}
+        ${section.rawMovementLists ? `
+          <details open>
+            <summary>接口原始行程列表</summary>
+            <pre>${escapeHtml(apiDebugJson(section.rawMovementLists))}</pre>
+          </details>
+        ` : ""}
         <h4>返回字段</h4>
         ${renderApiDebugFieldRows(section.raw)}
         <details>
@@ -9334,6 +9912,8 @@ function apiDebugSelectionSnapshot(sections) {
       request: apiDebugStorageSerialize(section.request || {}),
       raw: apiDebugStorageSerialize(section.raw),
       adapted: apiDebugStorageSerialize(section.adapted),
+      rawMovementLists: apiDebugStorageSerialize(section.rawMovementLists),
+      movementAudit: apiDebugStorageSerialize(section.movementAudit),
       callsignReport: apiDebugCallsignReport(section.raw, section.adapted)
     }))
   };
@@ -9477,6 +10057,8 @@ async function copyApiDebugSelection() {
       request: section.request,
       raw: section.raw,
       adapted: section.adapted,
+      rawMovementLists: section.rawMovementLists,
+      movementAudit: section.movementAudit,
       callsignReport: section.callsignReport || apiDebugCallsignReport(section.raw, section.adapted)
     })),
     retainedSelection: state.apiDebug.lastSelectionSnapshot || null,
@@ -10318,9 +10900,11 @@ function resetHistoryTimelineMount(options = {}) {
   const timeline = historyTimelineState();
   if (options.clearAnchor !== false) {
     timeline.anchorMonth = "";
+    timeline.anchorDay = "";
   }
   timeline.visibleCount = historyTimelineConfig.mountLimit;
   timeline.highlightMonth = options.highlightMonth || "";
+  timeline.highlightDay = options.highlightDay || "";
   timeline.summaryCollapsed = false;
 }
 
@@ -10434,6 +11018,9 @@ function historyScrollAnchorData(element) {
   if (element.dataset.historyFlightCard) {
     return { type: "flight", value: element.dataset.historyFlightCard };
   }
+  if (element.dataset.historyDayGroup) {
+    return { type: "day", value: element.dataset.historyDayGroup };
+  }
   if (element.dataset.historyMonthGroup) {
     return { type: "month", value: element.dataset.historyMonthGroup };
   }
@@ -10448,7 +11035,9 @@ function historyScrollAnchorElement(anchor, scroller = historyDetailScroller()) 
     ? "[data-history-flight-card]"
     : anchor.type === "month"
       ? "[data-history-month-group]"
-      : "";
+      : anchor.type === "day"
+        ? "[data-history-day-group]"
+        : "";
   if (!selector) {
     return null;
   }
@@ -10463,7 +11052,7 @@ function captureHistoryScrollAnchor(scroller) {
   const scrollerRect = scroller.getBoundingClientRect();
   const visibleTop = scrollerRect.top + 6;
   const visibleBottom = scrollerRect.bottom - 6;
-  const candidates = [...scroller.querySelectorAll("[data-history-flight-card], [data-history-month-group]")]
+  const candidates = [...scroller.querySelectorAll("[data-history-flight-card], [data-history-month-group], [data-history-day-group]")]
     .map((element) => {
       const anchor = historyScrollAnchorData(element);
       const rect = element.getBoundingClientRect();
@@ -10842,6 +11431,29 @@ function historyMonthLabel(monthKey) {
   return `${year} ${date.toLocaleString("en-US", { month: "short", timeZone: "UTC" })}`;
 }
 
+function historyDayKey(item) {
+  const epoch = historyComparableEpoch(item);
+  if (!Number.isFinite(Number(epoch)) || Number(epoch) <= 0) {
+    return "unknown";
+  }
+  const departure = historyPrimaryDeparture(item) || historyTimeRef(item, "scheduledDeparture");
+  const parts = historyDateParts(epoch, departure?.displayZone);
+  if (!parts) {
+    return "unknown";
+  }
+  return `${parts.year}-${String(parts.monthNumber).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
+
+function historyDayLabel(dayKey) {
+  if (dayKey === "unknown") {
+    return "日期未知";
+  }
+  const [year, month, day] = dayKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const weekday = date.toLocaleString("zh-CN", { weekday: "short", timeZone: "UTC" });
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")} ${weekday}`;
+}
+
 function historyDateLabel(item) {
   const departure = historyPrimaryDeparture(item) || historyTimeRef(item, "scheduledDeparture");
   const parts = historyDateParts(historyComparableEpoch(item), departure?.displayZone);
@@ -10923,6 +11535,9 @@ function historyStatus(item) {
   if (stateCode === 40 || /land|到达|已落地|完成/.test(normalized)) {
     return { key: "landed", label: "到达", tone: "landed" };
   }
+  if (stateCode === 60 || /变更|调整|改期|change|updated/.test(normalized)) {
+    return { key: "other", label: stateText || "变更", tone: "scheduled" };
+  }
   return { key: "unknown", label: stateText || "—", tone: "unknown" };
 }
 
@@ -10999,13 +11614,19 @@ function historyGroupFlights(flights) {
   const groups = [];
   const groupMap = new Map();
   flights.forEach((item) => {
-    const monthKey = historyMonthKey(item);
-    if (!groupMap.has(monthKey)) {
-      const group = { monthKey, label: historyMonthLabel(monthKey), flights: [], minutes: 0 };
-      groupMap.set(monthKey, group);
+    const dayKey = historyDayKey(item);
+    if (!groupMap.has(dayKey)) {
+      const group = {
+        dayKey,
+        monthKey: historyMonthKey(item),
+        label: historyDayLabel(dayKey),
+        flights: [],
+        minutes: 0
+      };
+      groupMap.set(dayKey, group);
       groups.push(group);
     }
-    const group = groupMap.get(monthKey);
+    const group = groupMap.get(dayKey);
     group.flights.push(item);
     group.minutes += historyCountedDurationMinutes(item);
   });
@@ -11512,7 +12133,6 @@ function renderHistoryFlightTableRow(item, options = {}) {
   const depTime = historyLocalTimeLabel(depRef);
   const arrRef = historyPrimaryArrival(item);
   const arrTime = historyLocalTimeLabel(arrRef);
-  const rowDate = historyRowDateMeta(item);
   const dayOffset = historyDayOffsetLabel(depRef, arrRef);
   const action = status.key === "live" ? "Live" : item.uniqueKey ? "Playback" : "No track";
   const disabledAction = status.key !== "live" && !item.uniqueKey;
@@ -11520,20 +12140,30 @@ function renderHistoryFlightTableRow(item, options = {}) {
   return `
     <article class="history-flight-row ${options.current ? "history-current-row" : ""}" data-status="${escapeHtml(status.tone)}">
       <button type="button" class="history-flight-row-main" data-history-flight-card="${escapeHtml(key)}" aria-expanded="${expanded ? "true" : "false"}">
-        <span class="history-flight-date-cell">
-          <strong>${escapeHtml(rowDate.date)}</strong>
-          <em>${escapeHtml(rowDate.weekday)}</em>
-        </span>
         <span class="history-flight-route-cell">
-          <span class="history-flight-airport-names ${status.key === "cancelled" ? "is-cancelled" : ""}" title="${escapeHtml(`${depAirport.name} → ${arrAirport.name}`)}">
-            <strong class="${depAirport.missing ? "missing" : ""}">${escapeHtml(depAirport.name)}</strong><i>▸</i><strong class="${arrAirport.missing ? "missing" : ""}">${escapeHtml(arrAirport.name)}</strong>
+          <span class="history-flight-airport history-flight-airport-dep ${status.key === "cancelled" ? "is-cancelled" : ""}" title="${escapeHtml(depAirport.name)}">
+            <strong class="${depAirport.missing ? "missing" : ""}">${escapeHtml(depAirport.name)}</strong>
+            <small class="history-flight-airport-codes">${escapeHtml(depAirport.codes)}</small>
           </span>
-          <span class="history-flight-airport-codes">${escapeHtml(depAirport.codes)} → ${escapeHtml(arrAirport.codes)}</span>
-          <span class="history-flight-local-times">${escapeHtml(depTime)} → ${escapeHtml(arrTime)}${dayOffset ? ` <em>${escapeHtml(dayOffset)}</em>` : ""}</span>
+          <span class="history-flight-duration-cell" aria-label="${escapeHtml(`${duration} · ${historyStatusActionLabel(status)}`)}">
+            <strong>${escapeHtml(duration)}</strong>
+            <em>${escapeHtml(historyStatusActionLabel(status))}</em>
+          </span>
+          <span class="history-flight-airport history-flight-airport-arr ${status.key === "cancelled" ? "is-cancelled" : ""}" title="${escapeHtml(arrAirport.name)}">
+            <strong class="${arrAirport.missing ? "missing" : ""}">${escapeHtml(arrAirport.name)}</strong>
+            <small class="history-flight-airport-codes">${escapeHtml(arrAirport.codes)}</small>
+          </span>
         </span>
-        <span class="history-flight-duration-cell">
-          <strong>${escapeHtml(duration)}</strong>
-          <em>${escapeHtml(historyStatusActionLabel(status))}</em>
+        <span class="history-flight-time-pair">
+          <span class="history-flight-time history-flight-time-depart">
+            <em>起飞</em>
+            <strong>${escapeHtml(depTime)}</strong>
+          </span>
+          <i aria-hidden="true">→</i>
+          <span class="history-flight-time history-flight-time-arrive">
+            <em>到达</em>
+            <strong>${escapeHtml(arrTime)}${dayOffset ? ` <mark>${escapeHtml(dayOffset)}</mark>` : ""}</strong>
+          </span>
         </span>
       </button>
       ${expanded ? `
@@ -11559,9 +12189,11 @@ function renderHistoryFlightTableRow(item, options = {}) {
 
 function renderHistoryTimelineGroups(flights) {
   const timeline = historyTimelineState();
-  const anchorIndex = timeline.anchorMonth
-    ? Math.max(0, flights.findIndex((item) => historyMonthKey(item) === timeline.anchorMonth))
-    : 0;
+  const anchorIndex = timeline.anchorDay
+    ? Math.max(0, flights.findIndex((item) => historyDayKey(item) === timeline.anchorDay))
+    : timeline.anchorMonth
+      ? Math.max(0, flights.findIndex((item) => historyMonthKey(item) === timeline.anchorMonth))
+      : 0;
   const startIndex = anchorIndex < 0 ? 0 : anchorIndex;
   const mounted = flights.slice(startIndex, startIndex + Math.max(historyTimelineConfig.mountLimit, timeline.visibleCount));
   const groups = historyGroupFlights(mounted);
@@ -11580,7 +12212,7 @@ function renderHistoryTimelineGroups(flights) {
     ${topNotice}
     <div class="history-flight-table">
       ${groups.map((group) => `
-        <section class="history-month-group history-month-table-group ${timeline.highlightMonth === group.monthKey ? "highlight" : ""}" data-history-month-group="${escapeHtml(group.monthKey)}">
+        <section class="history-month-group history-month-table-group history-day-table-group ${timeline.highlightDay === group.dayKey || timeline.highlightMonth === group.monthKey ? "highlight" : ""}" data-history-day-group="${escapeHtml(group.dayKey)}" data-history-month-group="${escapeHtml(group.monthKey)}">
           <header><span>${escapeHtml(group.label)}</span><em>${group.flights.length} 段 · ${escapeHtml(formatDuration(group.minutes * 60000))}</em></header>
           <div class="history-flight-table-rows">${group.flights.map((item) => renderHistoryFlightTableRow(item, { current: Boolean(currentFlightKey && historyFlightKey(item) === currentFlightKey) })).join("")}</div>
         </section>
@@ -11808,6 +12440,13 @@ function renderRecentFlights(jet, options = {}) {
     if (historyLoadKey) {
       loadAircraftHistory(jet);
       setRecentFlightsHtml(`<p class="empty-related">行程记录加载中...</p>`, options);
+      return;
+    }
+    if (!aircraftHistoryRequestTailNo(jet)) {
+      if (aircraftDetailIsLoading(jet) || aircraftNeedsDetailLoad(jet)) {
+        loadAircraftDetails(jet);
+      }
+      setRecentFlightsHtml(`<p class="empty-related">行程记录等待飞机信息同步...</p>`, options);
       return;
     }
     if (aircraftDetailIsLoading(jet) || aircraftNeedsDetailLoad(jet)) {
@@ -12845,31 +13484,47 @@ function renderAirportNoticeList(id, items, options = {}) {
 }
 
 function airportBoardDate(airport) {
-  return firstMatchedValue(airport?.apiDynamic?.date, airport?.apiDetail?.date, "");
+  return firstMatchedValue(
+    airport?.apiDailyFlights?.localDate,
+    airport?.apiDailyFlights?.date,
+    airport?.apiDynamic?.date,
+    airport?.apiDetail?.date,
+    ""
+  );
 }
 
 function parseAirportBoardClock(airport, value) {
-  const epoch = parsePanelEpoch(value);
+  const zone = airportBoardTimeZone(airport);
+  const cleanedValue = airportMovementCleanTimeValue(value);
+  const epoch = parsePanelEpoch(cleanedValue, { timeZone: zone === NA_TEXT ? "UTC" : zone });
   if (epoch !== null) {
     return epoch;
   }
-  const text = String(value || "").trim();
+  const text = String(cleanedValue || "").trim();
   const match = text.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
   const date = airportBoardDate(airport);
   if (!match || missingValue(date)) {
     return null;
   }
-  const parsed = Date.parse(`${date}T${String(match[1]).padStart(2, "0")}:${match[2]}:00+08:00`);
-  return Number.isFinite(parsed) ? parsed : null;
+  return parsePanelEpoch(`${date} ${String(match[1]).padStart(2, "0")}:${match[2]}:00`, {
+    timeZone: zone === NA_TEXT ? "UTC" : zone
+  });
+}
+
+function airportBoardTimeZone(airport) {
+  const info = mergePresentFields(airport?.apiDetail?.airportInfo, airport?.apiDynamic?.airportInfo, airport?.apiGround?.airportInfo);
+  return firstMatchedValue(info.zoneId, airport?.zoneId, info.timeZone, airport?.timeZone, "UTC");
 }
 
 function airportBoardTimeLabel(airport, value) {
-  const epoch = parseAirportBoardClock(airport, value);
+  const cleanedValue = airportMovementCleanTimeValue(value);
+  const epoch = parseAirportBoardClock(airport, cleanedValue);
   if (epoch === null) {
-    return firstMatchedValue(value, "--:--");
+    const text = String(firstMatchedValue(cleanedValue, "--:--")).trim();
+    const match = text.match(/(?:^|\s|T)(\d{1,2}):(\d{2})(?::\d{2})?/);
+    return match ? `${String(match[1]).padStart(2, "0")}:${match[2]}` : text;
   }
-  const info = airport.apiDetail?.airportInfo || airport.apiDynamic?.airportInfo || {};
-  const zone = firstMatchedValue(info.zoneId, airport.zoneId, info.timeZone, airport.timeZone);
+  const zone = airportBoardTimeZone(airport);
   return formatPanelTime(epoch, {
     date: false,
     timeZone: zone === NA_TEXT ? "UTC" : zone,
@@ -12903,28 +13558,54 @@ function airportDirectionForJet(jet, airport) {
 }
 
 function airportBoardStatus(record = {}) {
+  const stateCode = Number(firstMatchedValue(
+    record.flightState,
+    record.flightStateCode,
+    record.stateCode,
+    record.statusCode,
+    record.jet?.flightState,
+    record.jet?.flightDetail?.flightBaseInfo?.flightState,
+    record.jet?.flightDetail?.summaryInfo?.flightState,
+    ""
+  ));
   const text = String(firstMatchedValue(
-    record.status,
     record.flightStateStr,
+    record.status,
+    record.statusText,
+    record.stateText,
+    record.stateName,
     record.flightStatus,
     record.jet?.status,
     record.jet?.flightDetail?.flightBaseInfo?.flightStateStr,
+    record.jet?.flightDetail?.summaryInfo?.flightStateStr,
     ""
   )).trim();
   const lower = text.toLowerCase();
-  if (/取消|cancel/.test(text) || lower.includes("cancel")) {
+  if (stateCode === 50 || /取消|cancel/.test(text) || lower.includes("cancel")) {
     return { key: "cancelled", label: "取消" };
   }
   if (/延误|delay/.test(text) || lower.includes("delay")) {
     return { key: "delayed", label: "延误" };
   }
-  if (/到达|落地|land|arriv/.test(text) || record.onGround || record.jet?.onGround) {
-    return { key: "landed", label: "到达" };
+  if (stateCode === 10 || /待报批|pending approval|approval/.test(lower)) {
+    return { key: "scheduled", label: "待报批" };
   }
-  if (/计划|sched|pending/.test(text)) {
+  if (stateCode === 20 || /待出发|计划|sched|pending|预计/.test(text) || /sched|pending|planned/.test(lower)) {
     return { key: "scheduled", label: "计划" };
   }
-  return { key: "live", label: "在途" };
+  if (stateCode === 30 || /live|途中|巡航|在途|飞行中/.test(lower)) {
+    return { key: "live", label: "途中" };
+  }
+  if (stateCode === 40 || /到达|落地|land|arriv|完成/.test(text) || record.onGround || record.jet?.onGround) {
+    return { key: "landed", label: "到达" };
+  }
+  if (stateCode === 60 || /变更|调整|改期|change|updated/.test(lower)) {
+    return { key: "other", label: text || "变更" };
+  }
+  if (!missingValue(text)) {
+    return { key: "other", label: text };
+  }
+  return { key: "live", label: "途中" };
 }
 
 const airportMovementDiscoveryConfig = Object.freeze({
@@ -12946,6 +13627,31 @@ const airportMovementHistoryConfig = Object.freeze({
   maxArrivalDeltaMs: 3 * 24 * 60 * 60 * 1000
 });
 
+const airportMovementHistoryIndexConfig = Object.freeze({
+  rangeDays: 3,
+  pageSize: 40,
+  maxDailySeeds: 36,
+  maxSelectedGroundSeeds: 28,
+  maxLiveSeeds: 24,
+  maxCachedGroundSeeds: 48,
+  maxCachedGroundSeedsPerAirport: 6,
+  baseRelatedGroundAirports: 8,
+  maxRelatedGroundAirports: 24,
+  maxSeeds: 72,
+  concurrency: 4,
+  maxTrackArrivalEnrichmentsPerHistory: 1,
+  trackArrivalEnrichmentConcurrency: 1,
+  refreshMs: 300000
+});
+
+const airportMovementRenderConfig = Object.freeze({
+  initialRows: 24,
+  rowsStep: 24,
+  profilePreloadRows: 10,
+  renderDebounceMs: 180,
+  supplementRestartMs: 15000
+});
+
 function airportMovementBearingDegrees(start, end) {
   const lat1 = Number(start.lat) * Math.PI / 180;
   const lat2 = Number(end.lat) * Math.PI / 180;
@@ -12965,12 +13671,14 @@ function airportMovementHeadingDelta(a, b) {
 
 function airportMovementAirportFromHistory(item, side, zone = "") {
   const display = historyAirportDisplay(item, side);
+  const knownAirport = airportByCode(display.iata) || airportByCode(display.icao);
+  const info = mergePresentFields(knownAirport?.apiDetail?.airportInfo, knownAirport?.apiDynamic?.airportInfo, knownAirport?.apiGround?.airportInfo);
   return {
     name: display.name,
     iata: display.iata,
     icao: display.icao,
     codes: display.codes,
-    zone
+    zone: firstMatchedValue(zone, info.zoneId, knownAirport?.zoneId, info.timeZone, knownAirport?.timeZone, "")
   };
 }
 
@@ -13007,6 +13715,200 @@ function airportMovementModelLabel(source = {}) {
   return `${brand} ${model}`;
 }
 
+function airportMovementProfileTailNo(item = {}) {
+  const raw = item.rawRecord || item.raw || {};
+  return groundPlaneDirectValue(
+    item.tailNoEncrypted,
+    item.tailNo,
+    raw.tailNoEncrypted,
+    raw.tailNo,
+    item.jet?.tailNoEncrypted,
+    item.jet?.tailNo,
+    item.plane?.tailNoEncrypted,
+    item.plane?.tailNo,
+    item.plane?.raw?.tailNo
+  );
+}
+
+function airportMovementProfileSeed(item = {}) {
+  const tailNo = airportMovementProfileTailNo(item);
+  return {
+    id: item.identity || tailNo,
+    uniqueKey: item.identity || "",
+    tailNoEncrypted: tailNo,
+    tailNo,
+    registration: item.registration,
+    tailNoClear: item.registration,
+    tailNoDisplay: item.registration
+  };
+}
+
+function airportMovementProfileModelFields(detail) {
+  if (!detail) {
+    return {};
+  }
+  const plane = mergePresentFields(detail.raw?.planeInfo, detail.planeInfo);
+  const updates = detail.updates || {};
+  return {
+    brandName: firstMatchedValue(
+      updates.brandName,
+      updates.manufacturer,
+      plane.brandName,
+      plane.manufacturer,
+      ""
+    ),
+    brandNameEn: firstMatchedValue(plane.brandNameEn, plane.manufacturerEn, ""),
+    modelName: firstMatchedValue(
+      plane.modelName,
+      plane.model,
+      updates.modelName,
+      updates.family,
+      updates.model,
+      plane.modelNameEn,
+      ""
+    ),
+    modelNameEn: firstMatchedValue(plane.modelNameEn, ""),
+    modelCode: firstMatchedValue(
+      updates.aircraftTypeCode,
+      updates.icaoCode,
+      plane.icaoCode,
+      plane.aircraftTypeCode,
+      plane.modelCode,
+      ""
+    )
+  };
+}
+
+function airportMovementHasChineseText(value) {
+  return /[\u4e00-\u9fff]/.test(String(value || ""));
+}
+
+function airportMovementModelLabelWithProfile(item = {}, source = {}) {
+  const seed = airportMovementProfileSeed(item);
+  const detail = item.jet?.planeDetail || cachedAircraftProfileDetail(seed);
+  const profileFields = airportMovementProfileModelFields(detail);
+  const sourceModel = firstMatchedValue(source.modelName, source.model, source.family, "");
+  const profileModel = firstMatchedValue(profileFields.modelName, profileFields.modelNameEn, "");
+  const merged = mergePresentFields(profileFields, source);
+  if (airportMovementHasChineseText(profileModel) && !airportMovementHasChineseText(sourceModel)) {
+    merged.modelName = profileModel;
+  } else if (airportMovementHasChineseText(sourceModel)) {
+    merged.modelName = sourceModel;
+  }
+  return airportMovementModelLabel(merged);
+}
+
+function airportMovementModelNeedsProfile(item = {}) {
+  if (!dataService?.isEnabled() || !airportMovementProfileTailNo(item)) {
+    return false;
+  }
+  const model = String(item.model || "").trim();
+  if (missingValue(model)) {
+    return true;
+  }
+  return /^(未知机型|business jet|公务机)$/i.test(model);
+}
+
+function airportMovementProfileLoadState(key) {
+  return key ? state.airportMovementProfileLoads.get(key) : null;
+}
+
+function airportMovementProfileRecentlyAttempted(key) {
+  const loadedAt = Number(airportMovementProfileLoadState(key)?.loadedAt || 0);
+  return Boolean(loadedAt && Date.now() - loadedAt < 10 * 60 * 1000);
+}
+
+function scheduleAirportDynamicPanelRender(airportKey, delay = airportMovementRenderConfig.renderDebounceMs) {
+  if (!airportKey) {
+    return;
+  }
+  window.clearTimeout(state.airportDynamicRenderTimers.get(airportKey));
+  const timer = window.setTimeout(() => {
+    state.airportDynamicRenderTimers.delete(airportKey);
+    const currentAirport = selectedAirport();
+    if (currentAirport
+      && airportMovementDiscoveryKey(currentAirport) === airportKey
+      && state.airportSegment === "dynamic") {
+      renderAirportDynamicPanel(currentAirport);
+    }
+  }, delay);
+  state.airportDynamicRenderTimers.set(airportKey, timer);
+}
+
+function ensureAirportMovementProfiles(airport, items = [], options = {}) {
+  if (!dataService?.isEnabled() || !airport || !Array.isArray(items) || !items.length) {
+    return options.awaitAll ? Promise.resolve(false) : false;
+  }
+  const shouldRender = options.render !== false;
+  const selectedAirportKey = airportMovementDiscoveryKey(airport);
+  const targets = [];
+  const seen = new Set();
+  items.forEach((item) => {
+    if (!airportMovementModelNeedsProfile(item)) {
+      return;
+    }
+    const tailNo = airportMovementProfileTailNo(item);
+    const key = normalizedLookupKey(tailNo);
+    if (!key || seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    targets.push({ key, tailNo, item });
+  });
+  if (!targets.length) {
+    return options.awaitAll ? Promise.resolve(false) : false;
+  }
+  let hasPending = false;
+  const pendingTasks = [];
+  targets.slice(0, 12).forEach(({ key, tailNo, item }) => {
+    const current = airportMovementProfileLoadState(key);
+    if (current?.pending) {
+      hasPending = true;
+      pendingTasks.push(current.pending);
+      return;
+    }
+    if (airportMovementProfileRecentlyAttempted(key)) {
+      return;
+    }
+    hasPending = true;
+    const seed = airportMovementProfileSeed(item);
+    seed.tailNoEncrypted = tailNo;
+    seed.tailNo = tailNo;
+    const pending = dataService.getPlaneDetail(tailNo)
+      .then((detail) => {
+        if (detail) {
+          cacheAircraftProfileDetail(seed, detail);
+          applyPlaneDetailToMatchingAircraft(seed, detail);
+        }
+        state.airportMovementProfileLoads.set(key, {
+          loadedAt: Date.now(),
+          ok: Boolean(detail)
+        });
+      })
+      .catch(() => {
+        state.airportMovementProfileLoads.set(key, {
+          loadedAt: Date.now(),
+          ok: false
+        });
+      });
+    state.airportMovementProfileLoads.set(key, {
+      pending,
+      startedAt: Date.now()
+    });
+    pending.finally(() => {
+      if (shouldRender) {
+        scheduleAirportDynamicPanelRender(selectedAirportKey);
+      }
+      renderApiDebugConsole();
+    });
+    pendingTasks.push(pending);
+  });
+  if (options.awaitAll) {
+    return Promise.allSettled(pendingTasks).then(() => hasPending);
+  }
+  return hasPending;
+}
+
 function airportMovementArrivalRef(jet, arrivalSide) {
   const detail = jet?.flightDetail || {};
   const base = detail.flightBaseInfo || {};
@@ -13026,6 +13928,492 @@ function airportMovementArrivalRef(jet, arrivalSide) {
   });
 }
 
+const airportMovementGeneralListKeys = Object.freeze([
+  "flights",
+  "flightList",
+  "flightsList",
+  "movementFlights",
+  "movements",
+  "movementList",
+  "records",
+  "rows",
+  "list",
+  "todayFlights",
+  "todayFlightList",
+  "airportFlights",
+  "plannedFlights",
+  "planFlights",
+  "scheduledFlights",
+  "scheduleFlights",
+  "pendingFlights",
+  "cancelledFlights",
+  "canceledFlights",
+  "cancelFlights",
+  "cancelList",
+  "cancelledList",
+  "canceledList",
+  "otherFlights",
+  "abnormalFlights"
+]);
+
+const airportMovementArrivalListKeys = Object.freeze([
+  "arrivals",
+  "arrivalFlights",
+  "arrivalList",
+  "arrFlights",
+  "arrList",
+  "inbound",
+  "inboundFlights",
+  "inboundList",
+  "inboundActuallyList",
+  "actualInboundFlights",
+  "actualArrivalFlights",
+  "inboundPlanList",
+  "plannedInboundFlights",
+  "plannedArrivalFlights",
+  "scheduledInboundFlights",
+  "scheduledArrivalFlights",
+  "inboundScheduleList",
+  "arrivalScheduleList",
+  "inboundCancelList",
+  "arrivalCancelList",
+  "inboundCancelledList",
+  "arrivalCancelledList",
+  "cancelledInboundFlights",
+  "cancelledArrivalFlights",
+  "canceledInboundFlights",
+  "canceledArrivalFlights"
+]);
+
+const airportMovementDepartureListKeys = Object.freeze([
+  "departures",
+  "departureFlights",
+  "departureList",
+  "depFlights",
+  "depList",
+  "outbound",
+  "outboundFlights",
+  "outboundList",
+  "outboundActuallyList",
+  "actualOutboundFlights",
+  "actualDepartureFlights",
+  "outboundPlanList",
+  "plannedOutboundFlights",
+  "plannedDepartureFlights",
+  "scheduledOutboundFlights",
+  "scheduledDepartureFlights",
+  "outboundScheduleList",
+  "departureScheduleList",
+  "outboundCancelList",
+  "departureCancelList",
+  "outboundCancelledList",
+  "departureCancelledList",
+  "cancelledOutboundFlights",
+  "cancelledDepartureFlights",
+  "canceledOutboundFlights",
+  "canceledDepartureFlights"
+]);
+
+const airportMovementOwnerKeys = Object.freeze([
+  "flightsInfo",
+  "flightInfo",
+  "flightInfos",
+  "scheduleInfo",
+  "schedules",
+  "today",
+  "todayInfo",
+  "board",
+  "data",
+  "result"
+]);
+
+const airportMovementDepartureCodeFields = Object.freeze([
+  "depAirport",
+  "depAirportCode",
+  "depAirportIata",
+  "depAirportIataCode",
+  "depIata",
+  "depIataCode",
+  "depAirportIcao",
+  "depAirportIcaoCode",
+  "depIcao",
+  "depIcaoCode",
+  "departureAirport",
+  "departureAirportCode",
+  "departureAirportIata",
+  "departureAirportIataCode",
+  "departureIata",
+  "departureAirportIcao",
+  "departureAirportIcaoCode",
+  "departureIcao",
+  "origin",
+  "originAirport",
+  "originAirportCode",
+  "originIata",
+  "originIcao",
+  "from",
+  "fromAirport",
+  "fromAirportCode"
+]);
+
+const airportMovementArrivalCodeFields = Object.freeze([
+  "arrAirport",
+  "arrAirportCode",
+  "arrAirportIata",
+  "arrAirportIataCode",
+  "arrIata",
+  "arrIataCode",
+  "arrAirportIcao",
+  "arrAirportIcaoCode",
+  "arrIcao",
+  "arrIcaoCode",
+  "arrivalAirport",
+  "arrivalAirportCode",
+  "arrivalAirportIata",
+  "arrivalAirportIataCode",
+  "arrivalIata",
+  "arrivalAirportIcao",
+  "arrivalAirportIcaoCode",
+  "arrivalIcao",
+  "destination",
+  "destinationAirport",
+  "destinationAirportCode",
+  "destinationIata",
+  "destinationIcao",
+  "to",
+  "toAirport",
+  "toAirportCode"
+]);
+
+const airportMovementDepartureNameFields = Object.freeze([
+  "depAirportName",
+  "depAirportFullName",
+  "depAirportFourName",
+  "depCity",
+  "departureAirportName",
+  "departureAirportFullName",
+  "departureCity",
+  "originAirportName",
+  "originAirportFullName",
+  "originCity",
+  "fromName",
+  "fromCity"
+]);
+
+const airportMovementArrivalNameFields = Object.freeze([
+  "arrAirportName",
+  "arrAirportFullName",
+  "arrAirportFourName",
+  "arrCity",
+  "arrivalAirportName",
+  "arrivalAirportFullName",
+  "arrivalCity",
+  "destinationAirportName",
+  "destinationAirportFullName",
+  "destinationCity",
+  "toName",
+  "toCity"
+]);
+
+const airportMovementDepartureTimeFields = Object.freeze([
+  "depActualEpochMs",
+  "actualDepartureEpochMs",
+  "atdEpochMs",
+  "depTime1EpochMs",
+  "depTime1",
+  "depActualTime",
+  "actualDepartureTime",
+  "departureActualTime",
+  "depEstimatedEpochMs",
+  "estimatedDepartureEpochMs",
+  "etdEpochMs",
+  "depTime2EpochMs",
+  "depTime2",
+  "depEstimatedTime",
+  "estimatedDepartureTime",
+  "departureEstimatedTime",
+  "depScheduledEpochMs",
+  "scheduledDepartureEpochMs",
+  "stdEpochMs",
+  "stdTime",
+  "depPlanTime",
+  "depScheduledTime",
+  "scheduledDepartureTime",
+  "departurePlanTime",
+  "departureTime",
+  "depTime",
+  "departTime",
+  "depart"
+]);
+
+const airportMovementArrivalTimeFields = Object.freeze([
+  "arrActualEpochMs",
+  "actualArrivalEpochMs",
+  "ataEpochMs",
+  "arrTime1EpochMs",
+  "arrTime1",
+  "arrActualTime",
+  "actualArrivalTime",
+  "arrivalActualTime",
+  "arrEstimatedEpochMs",
+  "estimatedArrivalEpochMs",
+  "etaEpochMs",
+  "arrTime2EpochMs",
+  "arrTime2",
+  "arrEstimatedTime",
+  "estimatedArrivalTime",
+  "arrivalEstimatedTime",
+  "arrScheduledEpochMs",
+  "scheduledArrivalEpochMs",
+  "staEpochMs",
+  "staTime",
+  "arrPlanTime",
+  "arrScheduledTime",
+  "scheduledArrivalTime",
+  "arrivalPlanTime",
+  "arrivalTime",
+  "arrTime",
+  "arriveTime",
+  "arrive"
+]);
+
+function airportMovementCleanTimeValue(value, options = {}) {
+  if (value === null || value === undefined || value === "" || typeof value === "number" || value instanceof Date) {
+    return value;
+  }
+  if (value && typeof value === "object" && "epochMs" in value) {
+    return Number.isFinite(Number(value.epochMs))
+      ? value
+      : airportMovementCleanTimeValue(firstMatchedValue(value.raw, value.label, value.time, value.text, ""), options);
+  }
+  if (timeUtils.cleanTimeText) {
+    return timeUtils.cleanTimeText(value, options);
+  }
+  const text = String(value).replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+  if (!text || /^(?:--|-|—|N\/A|NA|NULL|UNDEFINED)$/i.test(text)) {
+    return "";
+  }
+  return text
+    .replace(/(^|\s)(?:N\/A|NA|NULL|UNDEFINED)(?=\s|$)/gi, " ")
+    .replace(/\s*(?:--|-|–|—|~|〜|→|->|=>|至|到)\s*$/u, "")
+    .replace(/^\s*(?:--|-|–|—|~|〜|→|->|=>|至|到)\s*/u, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function airportMovementFirstField(record = {}, fields = []) {
+  return firstMatchedValue(...fields.map((field) => record?.[field]));
+}
+
+function airportMovementFirstTimeField(record = {}, fields = [], options = {}) {
+  for (const field of fields) {
+    const value = record?.[field];
+    if (value === null || value === undefined || value === "") {
+      continue;
+    }
+    const cleaned = airportMovementCleanTimeValue(value, options);
+    if (!missingValue(cleaned)) {
+      return cleaned;
+    }
+  }
+  return "";
+}
+
+function airportMovementFirstCode(record = {}, fields = []) {
+  return normalizeAirportCodeText(airportMovementFirstField(record, fields));
+}
+
+function airportMovementDepartureCode(record = {}) {
+  return airportMovementFirstCode(record, airportMovementDepartureCodeFields);
+}
+
+function airportMovementArrivalCode(record = {}) {
+  return airportMovementFirstCode(record, airportMovementArrivalCodeFields);
+}
+
+function airportMovementSideName(record = {}, side = "dep") {
+  const fields = side === "arr" ? airportMovementArrivalNameFields : airportMovementDepartureNameFields;
+  return airportMovementFirstField(record, fields);
+}
+
+function airportMovementComparableName(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[·.,，。()（）\-_]/g, "")
+    .replace(/internationalairport|airport|aerodrome|aeroport/g, "")
+    .replace(/国际机场|机场|机场公司|飞行区/g, "");
+}
+
+function airportMovementAirportNameTokens(airport) {
+  const info = mergePresentFields(airport?.apiDynamic?.airportInfo, airport?.apiDetail?.airportInfo, airport?.apiGround?.airportInfo);
+  const strong = [
+    info.airportName,
+    info.airportFourName,
+    info.airportNameEn,
+    airport?.nameCn,
+    airport?.nameZh,
+    airport?.nameEn,
+    airport?.name,
+    airportDisplayName(airport)
+  ].map(airportMovementComparableName).filter(Boolean);
+  const weak = [
+    info.cityName,
+    airport?.city
+  ].map(airportMovementComparableName).filter(Boolean);
+  const source = strong.length ? strong : weak;
+  return source.filter((value, index, list) => value && list.indexOf(value) === index);
+}
+
+function airportMovementNameMatchesAirport(value, airport) {
+  const candidate = airportMovementComparableName(value);
+  if (!candidate || candidate.length < 2) {
+    return false;
+  }
+  return airportMovementAirportNameTokens(airport).some((token) => {
+    if (!token || token.length < 2) {
+      return false;
+    }
+    return token.includes(candidate) || candidate.includes(token);
+  });
+}
+
+function airportMovementAirportNameMatchScore(value, airport) {
+  const candidate = airportMovementComparableName(value);
+  if (!candidate || candidate.length < 2 || !airport) {
+    return 0;
+  }
+  return airportMovementAirportNameTokens(airport).reduce((score, token) => {
+    if (!token || token.length < 2) {
+      return score;
+    }
+    if (token === candidate) {
+      return Math.max(score, 120);
+    }
+    if (token.startsWith(candidate)) {
+      return Math.max(score, 95);
+    }
+    if (token.includes(candidate)) {
+      return Math.max(score, 72);
+    }
+    if (candidate.includes(token)) {
+      return Math.max(score, 54);
+    }
+    return score;
+  }, 0);
+}
+
+function airportMovementAirportByName(value) {
+  const candidate = airportMovementComparableName(value);
+  if (!candidate || candidate.length < 2) {
+    return null;
+  }
+  return airports
+    .map((airport) => ({
+      airport,
+      score: airportMovementAirportNameMatchScore(value, airport),
+      level: airportPriorityLevel(airport)
+    }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.level - b.level || compareAirportText(a.airport.id, b.airport.id))[0]?.airport || null;
+}
+
+function airportMovementSideKnownAirport(record = {}, selectedAirport, side = "dep", fallbackCode = "") {
+  const codeFields = side === "arr" ? airportMovementArrivalCodeFields : airportMovementDepartureCodeFields;
+  const code = airportMovementFirstCode(record, codeFields);
+  const fallback = normalizeAirportCodeText(fallbackCode);
+  const byCode = airportByCode(code) || airportByCode(fallback);
+  if (byCode) {
+    return byCode;
+  }
+  const name = airportMovementSideName(record, side);
+  if (selectedAirport && airportMovementNameMatchesAirport(name, selectedAirport)) {
+    return selectedAirport;
+  }
+  return airportMovementAirportByName(name);
+}
+
+function airportMovementSideMatchesAirport(record = {}, airport, side = "dep") {
+  const code = side === "arr" ? airportMovementArrivalCode(record) : airportMovementDepartureCode(record);
+  if (code && airportCodes(airport).has(code)) {
+    return true;
+  }
+  return airportMovementNameMatchesAirport(airportMovementSideName(record, side), airport);
+}
+
+function airportMovementDepartureValue(record = {}) {
+  return firstMatchedValue(
+    record.times?.actualDeparture,
+    record.times?.estimatedDeparture,
+    record.times?.scheduledDeparture,
+    airportMovementFirstTimeField(record, airportMovementDepartureTimeFields, { rangePart: "departure" })
+  );
+}
+
+function airportMovementArrivalValue(record = {}) {
+  return firstMatchedValue(
+    record.times?.actualArrival,
+    record.times?.estimatedArrival,
+    record.times?.scheduledArrival,
+    airportMovementFirstTimeField(record, airportMovementArrivalTimeFields, { rangePart: "arrival" })
+  );
+}
+
+function airportMovementAirportRecord(record = {}, side = "dep", fallbackCode = "", selectedAirport = null) {
+  const isDeparture = side === "dep";
+  const codeFields = isDeparture ? airportMovementDepartureCodeFields : airportMovementArrivalCodeFields;
+  const prefix = isDeparture ? "dep" : "arr";
+  const knownAirport = airportMovementSideKnownAirport(record, selectedAirport, side, fallbackCode);
+  const knownInfo = mergePresentFields(knownAirport?.apiDetail?.airportInfo, knownAirport?.apiDynamic?.airportInfo, knownAirport?.apiGround?.airportInfo);
+  const iataCandidate = firstAirportCodeByLength(3, knownInfo.airportCode, knownAirport?.iata, knownAirport?.airportCode, fallbackCode);
+  const icaoCandidate = firstAirportCodeByLength(4, knownInfo.icaoCode, knownAirport?.icaoCode, knownAirport?.icao, knownAirport?.id, fallbackCode);
+  const code = airportMovementFirstCode(record, codeFields)
+    || (iataCandidate === NA_TEXT ? "" : iataCandidate)
+    || (icaoCandidate === NA_TEXT ? "" : icaoCandidate)
+    || NA_TEXT;
+  const name = firstMatchedValue(
+    airportMovementSideName(record, side),
+    knownInfo.airportName,
+    knownInfo.airportFourName,
+    knownAirport?.nameCn,
+    knownAirport?.nameZh,
+    airportDisplayName(knownAirport)
+  );
+  return {
+    [`${prefix}Airport`]: code,
+    [`${prefix}Iata`]: firstAirportCodeByLength(
+      3,
+      record[`${prefix}Iata`],
+      record[`${prefix}IataCode`],
+      record[`${prefix}AirportIata`],
+      record[`${prefix}AirportIataCode`],
+      record[isDeparture ? "departureIata" : "arrivalIata"],
+      record[isDeparture ? "originIata" : "destinationIata"],
+      knownInfo.airportCode,
+      knownAirport?.iata,
+      knownAirport?.airportCode,
+      code
+    ),
+    [`${prefix}Icao`]: firstAirportCodeByLength(
+      4,
+      record[`${prefix}Icao`],
+      record[`${prefix}IcaoCode`],
+      record[`${prefix}AirportIcao`],
+      record[`${prefix}AirportIcaoCode`],
+      record[isDeparture ? "departureIcao" : "arrivalIcao"],
+      record[isDeparture ? "originIcao" : "destinationIcao"],
+      knownInfo.icaoCode,
+      knownAirport?.icaoCode,
+      knownAirport?.icao,
+      knownAirport?.id,
+      code
+    ),
+    [`${prefix}AirportName`]: name,
+    [`${prefix}ZoneId`]: firstMatchedValue(knownInfo.zoneId, knownAirport?.zoneId, knownInfo.timeZone, knownAirport?.timeZone, "")
+  };
+}
+
 function airportMovementArraySources(dynamic = {}) {
   const sources = [];
   const seen = new Set();
@@ -13042,11 +14430,22 @@ function airportMovementArraySources(dynamic = {}) {
       sources.push({ rows: value, direction });
     });
   };
-  const owners = [dynamic, dynamic.raw, dynamic.flightsInfo, dynamic.raw?.flightsInfo];
+  const owners = [];
+  const seenOwners = new Set();
+  const addOwner = (owner) => {
+    if (!owner || typeof owner !== "object" || Array.isArray(owner) || seenOwners.has(owner)) {
+      return;
+    }
+    seenOwners.add(owner);
+    owners.push(owner);
+    airportMovementOwnerKeys.forEach((key) => addOwner(owner[key]));
+  };
+  addOwner(dynamic);
+  addOwner(dynamic.raw);
   owners.forEach((owner) => {
-    add(owner, ["flights", "flightList", "flightsList", "movements", "movementList", "records", "rows", "list"]);
-    add(owner, ["arrivals", "arrivalFlights", "inbound", "inboundFlights", "inboundList"], "arrivals");
-    add(owner, ["departures", "departureFlights", "outbound", "outboundFlights", "outboundList"], "departures");
+    add(owner, airportMovementGeneralListKeys, "");
+    add(owner, airportMovementArrivalListKeys, "arrivals");
+    add(owner, airportMovementDepartureListKeys, "departures");
   });
   if (Array.isArray(dynamic.raw?.data) && !seen.has(dynamic.raw.data)) {
     sources.push({ rows: dynamic.raw.data, direction: "" });
@@ -13065,27 +14464,12 @@ function airportMovementDirection(record, airport, hint = "") {
   if (/departure|outbound|出港|离港/.test(directionText)) {
     return "departures";
   }
-  const codes = airportCodes(airport);
-  const fromCode = normalizeAirportCodeText(firstMatchedValue(
-    record.depAirport,
-    record.depAirportCode,
-    record.departureAirport,
-    record.departureAirportCode,
-    record.from,
-    record.depIcaoCode
-  ));
-  const toCode = normalizeAirportCodeText(firstMatchedValue(
-    record.arrAirport,
-    record.arrAirportCode,
-    record.arrivalAirport,
-    record.arrivalAirportCode,
-    record.to,
-    record.arrIcaoCode
-  ));
-  if (toCode && codes.has(toCode) && (!fromCode || !codes.has(fromCode))) {
+  const outbound = airportMovementSideMatchesAirport(record, airport, "dep");
+  const inbound = airportMovementSideMatchesAirport(record, airport, "arr");
+  if (inbound && !outbound) {
     return "arrivals";
   }
-  if (fromCode && codes.has(fromCode)) {
+  if (outbound) {
     return "departures";
   }
   return "";
@@ -13121,14 +14505,71 @@ function airportMovementRegistration(record = {}) {
     registrationClear: record.registrationClear,
     tailNoClear: record.tailNoClear,
     registration: record.registration,
-    tailNoDisplay: record.tailNoDisplay
+    tailNoDisplay: firstMatchedValue(record.tailNoDisplay, record.tailNo, record.tailNumber, record.aircraftRegistration, record.aircraftTailNo)
   }).display;
 }
 
 function airportMovementDateTime(date, time) {
-  const dateText = missingValue(date) ? "" : String(date).trim();
-  const timeText = missingValue(time) ? "" : String(time).trim();
+  const dateText = missingValue(date) ? "" : String(airportMovementCleanTimeValue(date)).trim().slice(0, 10);
+  const timeText = missingValue(time) ? "" : String(airportMovementCleanTimeValue(time)).trim();
+  if (/^\d{4}-\d{2}-\d{2}(?:[T\s]\d{1,2}:\d{2})?/.test(timeText)) {
+    return timeText;
+  }
   return dateText && timeText ? `${dateText} ${timeText}` : timeText || dateText;
+}
+
+function airportMovementDurationMinutes(record = {}) {
+  const value = firstMatchedValue(
+    record.estimateTime,
+    record.estimateTimeMinutes,
+    record.estimatedDurationMinutes,
+    record.durationMinutes,
+    record.flightDurationMinutes,
+    record.blockTimeMinutes,
+    record.duration,
+    record.flightDuration
+  );
+  if (missingValue(value)) {
+    return null;
+  }
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric > 0) {
+    return numeric;
+  }
+  const text = String(value).trim();
+  const hourMinute = text.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (hourMinute) {
+    return Number(hourMinute[1]) * 60 + Number(hourMinute[2]);
+  }
+  const hours = text.match(/(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours|小时)/i);
+  const minutes = text.match(/(\d+(?:\.\d+)?)\s*(?:m|min|mins|minute|minutes|分钟)/i);
+  const total = (hours ? Number(hours[1]) * 60 : 0) + (minutes ? Number(minutes[1]) : 0);
+  return total > 0 ? total : null;
+}
+
+function airportMovementTimeZoneForRef(boardAirport, sideAirport) {
+  return firstMatchedValue(sideAirport?.zone, airportBoardTimeZone(boardAirport), "UTC");
+}
+
+function airportMovementTimeRef(boardAirport, value, sideAirport, options = {}) {
+  const cleaned = airportMovementCleanTimeValue(value, options);
+  return makePanelTimeRef(cleaned, {
+    ...options,
+    timeZone: airportMovementTimeZoneForRef(boardAirport, sideAirport)
+  });
+}
+
+function airportMovementEstimatedArrivalRef(boardAirport, record, departureRef, arrivalAirport) {
+  const departureEpoch = Number(departureRef?.epochMs);
+  const durationMinutes = airportMovementDurationMinutes(record);
+  if (!Number.isFinite(departureEpoch) || durationMinutes === null || durationMinutes <= 0) {
+    return null;
+  }
+  return makePanelTimeRef(departureEpoch + durationMinutes * 60 * 1000, {
+    timeZone: airportMovementTimeZoneForRef(boardAirport, arrivalAirport),
+    sourceField: "movement.departure+duration",
+    semantic: "estimated_arrival"
+  });
 }
 
 function normalizeAirportMovementRecord(airport, record = {}, directionHint = "", index = 0) {
@@ -13140,36 +14581,48 @@ function normalizeAirportMovementRecord(airport, record = {}, directionHint = ""
     return null;
   }
   const jet = airportMovementLiveJet(record);
-  const fromCode = normalizeAirportCodeText(firstMatchedValue(record.depAirport, record.depAirportCode, record.departureAirport, record.from, record.depIcaoCode)) || NA_TEXT;
-  const toCode = normalizeAirportCodeText(firstMatchedValue(record.arrAirport, record.arrAirportCode, record.arrivalAirport, record.to, record.arrIcaoCode)) || NA_TEXT;
+  const homeAirport = airportMovementHomeAirport(airport);
+  const homeCode = firstMatchedValue(homeAirport.iata, homeAirport.icao);
+  const fromCode = airportMovementDepartureCode(record) || (direction === "departures" ? homeCode : NA_TEXT);
+  const toCode = airportMovementArrivalCode(record) || (direction === "arrivals" ? homeCode : NA_TEXT);
   const registration = airportMovementRegistration(record);
-  const departure = firstMatchedValue(record.depActualEpochMs, record.actualDepartureEpochMs, record.depTime1, record.depActualTime, record.departureTime, record.depTime, record.depart);
+  const departure = airportMovementDepartureValue(record);
   const status = airportBoardStatus(record);
-  const arrival = firstMatchedValue(
-    record.arrActualEpochMs,
-    record.actualArrivalEpochMs,
-    record.arrActualTime,
-    record.arrTime1,
-    record.arrivalTime,
-    record.arrTime,
-    record.arrive
-  );
+  const arrival = airportMovementArrivalValue(record);
   const directionLabel = direction === "arrivals" ? "进港" : "出港";
   const otherCode = direction === "arrivals" ? fromCode : toCode;
-  const departureAirport = airportMovementAirportFromHistory({
-    depAirport: fromCode,
-    depIata: record.depIata,
-    depIcao: firstMatchedValue(record.depIcao, record.depIcaoCode),
-    depAirportName: firstMatchedValue(record.depAirportName, record.departureAirportName)
-  }, "dep", firstMatchedValue(record.depZoneId, record.depTimeZone, ""));
-  const arrivalAirport = airportMovementAirportFromHistory({
-    arrAirport: toCode,
-    arrIata: record.arrIata,
-    arrIcao: firstMatchedValue(record.arrIcao, record.arrIcaoCode),
-    arrAirportName: firstMatchedValue(record.arrAirportName, record.arrivalAirportName)
-  }, "arr", firstMatchedValue(record.arrZoneId, record.arrTimeZone, ""));
+  const recordSource = firstMatchedValue(record.sourcePid, record.source, "dynamic");
+  const tailNoEncrypted = groundPlaneDirectValue(record.tailNoEncrypted, record.tailNo, record.raw?.tailNo);
+  const departureRecord = airportMovementAirportRecord(record, "dep", fromCode, airport);
+  const arrivalRecord = airportMovementAirportRecord(record, "arr", toCode, airport);
+  const departureAirport = airportMovementAirportFromHistory(
+    departureRecord,
+    "dep",
+    firstMatchedValue(record.depZoneId, record.depTimeZone, record.departureTimeZone, record.originTimeZone, departureRecord.depZoneId, "")
+  );
+  const arrivalAirport = airportMovementAirportFromHistory(
+    arrivalRecord,
+    "arr",
+    firstMatchedValue(record.arrZoneId, record.arrTimeZone, record.arrivalTimeZone, record.destinationTimeZone, arrivalRecord.arrZoneId, "")
+  );
+  const actualDepartureRef = airportMovementTimeRef(airport, departure, departureAirport, {
+    sourceField: "movement.departure",
+    semantic: "actual_departure",
+    rangePart: "departure"
+  });
+  const rawArrivalRef = airportMovementTimeRef(airport, arrival, arrivalAirport, {
+    sourceField: "movement.arrival",
+    semantic: "actual_arrival",
+    rangePart: "arrival"
+  });
+  const estimatedArrivalRef = rawArrivalRef.epochMs === null
+    ? airportMovementEstimatedArrivalRef(airport, record, actualDepartureRef, arrivalAirport)
+    : null;
+  const actualArrivalRef = estimatedArrivalRef || rawArrivalRef;
   return {
-    source: "dynamic",
+    source: recordSource,
+    tailNoEncrypted,
+    rawRecord: record,
     jet,
     plane: null,
     direction,
@@ -13177,34 +14630,46 @@ function normalizeAirportMovementRecord(airport, record = {}, directionHint = ""
     fromCode,
     toCode,
     otherCode,
-    callsign: firstMatchedValue(record.callSign, record.callsign, record.flightNo, registration),
+    callsign: firstMatchedValue(record.callSign, record.callsign, record.flightNo, record.flightNumber, registration),
     registration,
-    model: airportMovementModelLabel(record),
+    model: airportMovementModelLabelWithProfile({ tailNoEncrypted, registration }, record),
     departureAirport,
     arrivalAirport,
-    departure,
-    arrival,
-    actualDepartureRef: makePanelTimeRef(departure, {
-      timeZone: departureAirport.zone,
-      sourceField: "movement.depActual",
-      semantic: "actual_departure"
-    }),
-    actualArrivalRef: makePanelTimeRef(arrival, {
-      timeZone: arrivalAirport.zone,
-      sourceField: "movement.arrActual",
-      semantic: "actual_arrival"
-    }),
+    departure: actualDepartureRef.raw || airportMovementCleanTimeValue(departure, { rangePart: "departure" }),
+    arrival: actualArrivalRef.raw || airportMovementCleanTimeValue(arrival, { rangePart: "arrival" }),
+    actualDepartureRef,
+    actualArrivalRef,
     status,
-    sortEpoch: parseAirportBoardClock(airport, firstMatchedValue(departure, arrival)) || 0,
-    identity: normalizedLookupKey(firstMatchedValue(record.uniqueKey, record.flightUniqueKey, record.flightId, `${direction}-${fromCode}-${toCode}-${departure}-${index}`))
+    sortEpoch: actualDepartureRef.epochMs || actualArrivalRef.epochMs || parseAirportBoardClock(airport, firstMatchedValue(departure, arrival)) || 0,
+    identity: normalizedLookupKey(firstMatchedValue(record.uniqueKey, record.flightUniqueKey, record.flightId, record.id, `${direction}-${fromCode}-${toCode}-${airportMovementTimeIdentityValue(departure)}-${airportMovementTimeIdentityValue(arrival)}-${status.key}-${index}`))
   };
 }
 
-function airportDynamicInterfaceItems(airport) {
-  const dynamic = airport?.apiDynamic || {};
-  return airportMovementArraySources(dynamic).flatMap((source) => source.rows
+function airportMovementInterfaceItemsFromSources(airport, sources = []) {
+  return sources.flatMap((dynamic) => airportMovementArraySources(dynamic).flatMap((source) => source.rows
     .map((record, index) => normalizeAirportMovementRecord(airport, record, source.direction, index))
-    .filter(Boolean));
+    .filter(Boolean)));
+}
+
+function airportDailyInterfaceItems(airport) {
+  return airportMovementInterfaceItemsFromSources(airport, [
+    airport?.apiDailyFlights || {}
+  ]);
+}
+
+function airportFallbackDynamicInterfaceItems(airport) {
+  return airportMovementInterfaceItemsFromSources(airport, [
+    airport?.apiDynamic || {},
+    airport?.apiDetail || {}
+  ]);
+}
+
+function airportDynamicInterfaceItems(airport) {
+  return airportMovementInterfaceItemsFromSources(airport, [
+    airport?.apiDailyFlights || {},
+    airport?.apiDynamic || {},
+    airport?.apiDetail || {}
+  ]);
 }
 
 function airportLiveMovementItems(airport) {
@@ -13244,8 +14709,10 @@ function airportLiveMovementItems(airport) {
       plane.tailNoDisplay,
       aircraftCallsignLabel(jet, "")
     );
+    const tailNoEncrypted = groundPlaneDirectValue(jet.tailNoEncrypted, jet.tailNo, plane.tailNoEncrypted, plane.tailNo);
     return {
       source: "live",
+      tailNoEncrypted,
       jet,
       plane: null,
       direction,
@@ -13255,7 +14722,7 @@ function airportLiveMovementItems(airport) {
       otherCode: direction === "arrivals" ? fromCode : toCode,
       callsign: registration,
       registration,
-      model: airportMovementModelLabel({ ...jet, ...plane }),
+      model: airportMovementModelLabelWithProfile({ tailNoEncrypted, registration, jet }, { ...jet, ...plane }),
       departureAirport,
       arrivalAirport,
       departure: actualDepartureRef,
@@ -13415,10 +14882,11 @@ function applyAirportMovementHistoryMatches(candidates, matches) {
   });
 }
 
-async function discoverAirportMovementHistory(airport) {
+async function discoverAirportMovementHistory(airport, options = {}) {
   if (!dataService?.isEnabled() || !airport || state.airportSegment !== "dynamic") {
     return;
   }
+  const shouldRender = options.render !== false;
   const airportKey = airportMovementDiscoveryKey(airport);
   const candidates = airportMovementHistoryCandidates(airport);
   if (!airportKey || !candidates.length) {
@@ -13464,9 +14932,11 @@ async function discoverAirportMovementHistory(airport) {
       fingerprint,
       matches
     });
-    const currentAirport = selectedAirport();
-    if (currentAirport && airportMovementDiscoveryKey(currentAirport) === airportKey && state.airportSegment === "dynamic") {
-      renderAirportDynamicPanel(currentAirport);
+    if (shouldRender) {
+      const currentAirport = selectedAirport();
+      if (currentAirport && airportMovementDiscoveryKey(currentAirport) === airportKey && state.airportSegment === "dynamic") {
+        renderAirportDynamicPanel(currentAirport);
+      }
     }
   })();
   state.airportMovementHistory.set(airportKey, {
@@ -13493,6 +14963,7 @@ function airportGroundFallbackMovementItems(airport) {
       depAirportName: plane.depAirportName
     }, "dep", firstMatchedValue(history?.depTimeZone, plane.depZoneId, plane.depTimeZone, ""));
     const registration = groundPlaneRegistrationState(plane).display;
+    const tailNoEncrypted = groundPlaneDirectValue(plane.tailNoEncrypted, plane.tailNo, plane.raw?.tailNo);
     const actualDepartureRef = history?.depTimeRef || makePanelTimeRef("", {
       timeZone: departureAirport.zone,
       semantic: "actual_departure"
@@ -13504,6 +14975,7 @@ function airportGroundFallbackMovementItems(airport) {
     });
     return {
       source: "ground",
+      tailNoEncrypted,
       jet: null,
       plane,
       direction: "arrivals",
@@ -13513,7 +14985,7 @@ function airportGroundFallbackMovementItems(airport) {
       otherCode: fromCode,
       callsign: registration,
       registration,
-      model: airportMovementModelLabel(plane),
+      model: airportMovementModelLabelWithProfile({ tailNoEncrypted, registration, plane }, plane),
       departureAirport,
       arrivalAirport: homeAirport,
       departure: actualDepartureRef,
@@ -13527,32 +14999,959 @@ function airportGroundFallbackMovementItems(airport) {
   });
 }
 
+function airportMovementDateKeyForRef(ref, fallbackZone = "UTC") {
+  const epoch = Number(ref?.epochMs);
+  if (!Number.isFinite(epoch)) {
+    return "";
+  }
+  const zone = firstMatchedValue(ref.displayZone, fallbackZone, "UTC");
+  try {
+    const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+      timeZone: zone === NA_TEXT ? "UTC" : zone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(new Date(epoch)).map((part) => [part.type, part.value]));
+    return `${parts.year}-${parts.month}-${parts.day}`;
+  } catch (_error) {
+    return new Date(epoch).toISOString().slice(0, 10);
+  }
+}
+
+function airportMovementHistoryDirection(flight, airport) {
+  const selectedCodes = airportCodes(airport);
+  const fromCodes = [
+    flight?.depAirport,
+    flight?.depIata,
+    flight?.depIcao
+  ].map(normalizeAirportCodeText).filter(Boolean);
+  const toCodes = [
+    flight?.arrAirport,
+    flight?.arrIata,
+    flight?.arrIcao
+  ].map(normalizeAirportCodeText).filter(Boolean);
+  const inbound = toCodes.some((code) => selectedCodes.has(code));
+  const outbound = fromCodes.some((code) => selectedCodes.has(code));
+  if (outbound && !inbound) {
+    return "departures";
+  }
+  if (inbound) {
+    return "arrivals";
+  }
+  return outbound ? "departures" : "";
+}
+
+function airportMovementHistoryEventRef(flight, direction) {
+  if (direction === "departures") {
+    return historyPrimaryDeparture(flight) || historyTimeRef(flight, "scheduledDeparture");
+  }
+  return historyPrimaryArrival(flight) || historyTimeRef(flight, "scheduledArrival");
+}
+
+function airportMovementHistoryBelongsToBoardDate(airport, flight, direction, status) {
+  const boardDate = airportBoardLocalDate(airport);
+  const eventRef = airportMovementHistoryEventRef(flight, direction);
+  if (!boardDate || !eventRef?.epochMs) {
+    return status?.key === "live";
+  }
+  const fallbackZone = direction === "departures" ? flight?.depTimeZone : flight?.arrTimeZone;
+  return airportMovementDateKeyForRef(eventRef, fallbackZone) === boardDate;
+}
+
+function airportGlobalHistoryMovementItems(airport) {
+  const items = [];
+  const homeAirport = airportMovementHomeAirport(airport);
+  businessJets.forEach((jet) => {
+    const detail = jet.flightHistoryDetail || cachedAircraftHistoryDetail(jet);
+    const flights = Array.isArray(detail?.flights) ? detail.flights : [];
+    flights.forEach((flight, index) => {
+      const direction = airportMovementHistoryDirection(flight, airport);
+      if (!direction) {
+        return;
+      }
+      const status = historyStatus(flight);
+      if (!airportMovementHistoryBelongsToBoardDate(airport, flight, direction, status)) {
+        return;
+      }
+      const fromCode = airportMovementDepartureCode(flight) || NA_TEXT;
+      const toCode = airportMovementArrivalCode(flight) || NA_TEXT;
+      const departureAirport = airportMovementAirportFromHistory(flight, "dep", firstMatchedValue(flight.depTimeZone, homeAirport.zone, ""));
+      const arrivalAirport = airportMovementAirportFromHistory(flight, "arr", firstMatchedValue(flight.arrTimeZone, homeAirport.zone, ""));
+      const actualDepartureRef = historyPrimaryDeparture(flight) || historyTimeRef(flight, "scheduledDeparture");
+      const actualArrivalRef = historyPrimaryArrival(flight) || historyTimeRef(flight, "scheduledArrival");
+      const registration = firstMatchedValue(
+        jet.registration,
+        jet.tailNoClear,
+        jet.registrationClear,
+        jet.tailNoDisplay,
+        aircraftCallsignLabel(jet, "")
+      );
+      const tailNoEncrypted = groundPlaneDirectValue(jet.tailNoEncrypted, jet.tailNo, flight.tailNoEncrypted, flight.tailNo);
+      items.push({
+        source: "history",
+        tailNoEncrypted,
+        jet,
+        plane: null,
+        direction,
+        directionLabel: direction === "arrivals" ? "进港" : "出港",
+        fromCode,
+        toCode,
+        otherCode: direction === "arrivals" ? fromCode : toCode,
+        callsign: firstMatchedValue(flight.callSign, flight.callsign, flight.flightNo, registration),
+        registration,
+        model: airportMovementModelLabelWithProfile({ tailNoEncrypted, registration, jet }, { ...jet, ...flight }),
+        departureAirport,
+        arrivalAirport,
+        departure: actualDepartureRef,
+        arrival: actualArrivalRef,
+        actualDepartureRef,
+        actualArrivalRef,
+        status,
+        sortEpoch: Number(airportMovementHistoryEventRef(flight, direction)?.epochMs) || historyComparableEpoch(flight) || index,
+        identity: normalizedLookupKey(firstMatchedValue(flight.uniqueKey, flight.flightId, flight.id, historyFlightKey(flight), `${direction}-${fromCode}-${toCode}-${index}`))
+      });
+    });
+  });
+  return items;
+}
+
+function airportMovementHistoryIndexCacheKey(airport) {
+  const airportKey = airportMovementDiscoveryKey(airport);
+  const date = airportBoardLocalDate(airport);
+  return airportKey && date ? `${airportKey}:${date}` : "";
+}
+
+function airportMovementHistoryIndexItems(airport) {
+  const key = airportMovementHistoryIndexCacheKey(airport);
+  const cached = key ? state.airportMovementHistoryIndex.get(key) : null;
+  return Array.isArray(cached?.items) ? cached.items : [];
+}
+
+function airportMovementHistoryIndexFresh(airport) {
+  const key = airportMovementHistoryIndexCacheKey(airport);
+  const cached = key ? state.airportMovementHistoryIndex.get(key) : null;
+  return Boolean(cached?.loadedAt && Date.now() - cached.loadedAt < airportMovementHistoryIndexConfig.refreshMs);
+}
+
+function airportMovementHistoryIndexPending(airport) {
+  const key = airportMovementHistoryIndexCacheKey(airport);
+  const cached = key ? state.airportMovementHistoryIndex.get(key) : null;
+  return Boolean(cached?.pending);
+}
+
+function airportMovementHistoryIndexRequestTailNo(seed = {}) {
+  return groundPlaneDirectValue(
+    seed.requestTailNo,
+    seed.tailNoEncrypted,
+    seed.tailNo,
+    seed.jet ? aircraftHistoryRequestTailNo(seed.jet) : "",
+    seed.plane?.tailNoEncrypted,
+    seed.plane?.tailNo,
+    seed.plane?.raw?.tailNo
+  );
+}
+
+function airportMovementHistoryIndexSeedKey(seed = {}) {
+  return normalizedLookupKey(firstMatchedValue(
+    airportMovementHistoryIndexRequestTailNo(seed),
+    seed.registration,
+    seed.tailNoClear,
+    seed.tailNoDisplay,
+    seed.jet?.uniqueKey,
+    seed.jet?.id,
+    seed.source
+  ));
+}
+
+function airportMovementHistoryIndexRegistration(seed = {}) {
+  const plane = seed.plane || {};
+  const jet = seed.jet || {};
+  return firstMatchedValue(
+    seed.registration,
+    plane.registrationClear,
+    plane.tailNoClear,
+    plane.registration,
+    plane.tailNoDisplay,
+    jet.registration,
+    jet.tailNoClear,
+    jet.tailNoDisplay
+  );
+}
+
+function airportMovementHistoryIndexModelSource(seed = {}) {
+  const plane = seed.plane || {};
+  const jet = seed.jet || {};
+  return {
+    brandName: firstMatchedValue(seed.brandName, plane.brandName, jet.brandName, jet.family),
+    modelName: firstMatchedValue(seed.modelName, plane.modelName, jet.modelName, jet.model),
+    modelCode: firstMatchedValue(seed.modelCode, plane.modelCode, plane.icaoCode, jet.aircraftTypeCode, jet.icaoCode)
+  };
+}
+
+function airportMovementHistoryIndexSeedFromGroundPlane(airport, plane, options = {}) {
+  const requestTailNo = groundPlaneDirectValue(plane?.tailNoEncrypted, plane?.tailNo, plane?.raw?.tailNo);
+  if (!requestTailNo) {
+    return null;
+  }
+  const modelSource = airportMovementHistoryIndexModelSource({ plane });
+  return {
+    type: "ground",
+    source: options.source || "selected-ground",
+    priority: options.priority ?? 30,
+    requestTailNo,
+    plane,
+    airportCode: firstMatchedValue(options.airportCode, airport?.iata, airport?.airportCode),
+    registration: airportMovementHistoryIndexRegistration({ plane }),
+    ...modelSource
+  };
+}
+
+function airportMovementHistoryIndexSeedFromJet(jet, options = {}) {
+  const requestTailNo = aircraftHistoryRequestTailNo(jet);
+  if (!requestTailNo) {
+    return null;
+  }
+  const modelSource = airportMovementHistoryIndexModelSource({ jet });
+  return {
+    type: "live",
+    source: options.source || "live",
+    priority: options.priority ?? 50,
+    requestTailNo,
+    jet,
+    registration: airportMovementHistoryIndexRegistration({ jet }),
+    ...modelSource
+  };
+}
+
+function airportMovementHistoryIndexAddSeed(target, seed) {
+  if (!seed) {
+    return;
+  }
+  const requestTailNo = airportMovementHistoryIndexRequestTailNo(seed);
+  if (!requestTailNo) {
+    return;
+  }
+  const key = normalizedLookupKey(requestTailNo);
+  const existing = target.get(key);
+  if (!existing || Number(seed.priority) > Number(existing.priority)) {
+    target.set(key, seed);
+  }
+}
+
+function airportMovementHistoryIndexSelectedGroundSeeds(airport) {
+  return airportGroundPlanes(airport)
+    .map((plane, index) => ({
+      plane,
+      index,
+      current: airportGroundPlaneIsCurrentMovement(airport, plane),
+      groundSeconds: groundTimeSeconds(plane)
+    }))
+    .sort((a, b) => (
+      Number(b.current) - Number(a.current)
+      || (a.groundSeconds ?? Number.POSITIVE_INFINITY) - (b.groundSeconds ?? Number.POSITIVE_INFINITY)
+      || a.index - b.index
+    ))
+    .slice(0, airportMovementHistoryIndexConfig.maxSelectedGroundSeeds)
+    .map(({ plane, current }) => airportMovementHistoryIndexSeedFromGroundPlane(airport, plane, {
+      source: "selected-airport-ground",
+      priority: current ? 90 : 76
+    }))
+    .filter(Boolean);
+}
+
+function airportMovementHistoryIndexLiveSeeds(airport) {
+  const seeds = new Map();
+  businessJets
+    .filter((jet) => airportDirectionForJet(jet, airport))
+    .forEach((jet) => airportMovementHistoryIndexAddSeed(seeds, airportMovementHistoryIndexSeedFromJet(jet, {
+      source: "live-matched",
+      priority: 82
+    })));
+  airportMovementDiscoveryCandidates(airport)
+    .slice(0, airportMovementHistoryIndexConfig.maxLiveSeeds)
+    .forEach((jet) => airportMovementHistoryIndexAddSeed(seeds, airportMovementHistoryIndexSeedFromJet(jet, {
+      source: "live-candidate",
+      priority: 62
+    })));
+  return Array.from(seeds.values()).slice(0, airportMovementHistoryIndexConfig.maxLiveSeeds);
+}
+
+function airportMovementHistoryIndexDailySeedEntries(airport) {
+  const entries = airportDailyInterfaceItems(airport)
+    .map((item, index) => ({
+      item,
+      index,
+      needsArrival: airportMovementItemNeedsArrivalSupplement(item),
+      requestTailNo: airportMovementHistoryIndexRequestTailNo(item),
+      sortEpoch: Number(item?.sortEpoch) || airportMovementItemTimeEpoch(item?.actualDepartureRef) || Number.POSITIVE_INFINITY
+    }))
+    .filter((entry) => entry.requestTailNo);
+  const hasArrivalGaps = entries.some((entry) => entry.needsArrival);
+  return entries
+    .filter((entry) => !hasArrivalGaps || entry.needsArrival)
+    .sort((a, b) => (
+      Number(b.needsArrival) - Number(a.needsArrival)
+      || a.sortEpoch - b.sortEpoch
+      || a.index - b.index
+    ));
+}
+
+function airportMovementHistoryIndexDailySeeds(airport) {
+  return airportMovementHistoryIndexDailySeedEntries(airport)
+    .slice(0, airportMovementHistoryIndexConfig.maxDailySeeds)
+    .map(({ item, needsArrival }) => ({
+      type: "daily",
+      source: "513016-daily",
+      priority: needsArrival ? 96 : 72,
+      requestTailNo: airportMovementHistoryIndexRequestTailNo(item),
+      registration: firstMatchedValue(item.registration, item.callsign),
+      direction: item.direction,
+      fromCode: item.fromCode,
+      toCode: item.toCode,
+      departure: item.actualDepartureRef || item.departure,
+      arrival: item.actualArrivalRef || item.arrival,
+      modelName: item.model,
+      movementItem: item
+    }))
+    .filter(Boolean);
+}
+
+function airportMovementHistoryIndexCachedGroundSeeds(airport) {
+  const selectedCodes = airportCodes(airport);
+  const seenDetails = new Set();
+  const relatedEntries = airportMovementRelatedAirportCodeEntries(airport);
+  const relatedScores = new Map(relatedEntries.map((entry) => [entry.code, entry.score]));
+  const detailEntries = [];
+  state.airportGroundDetails.forEach((detail) => {
+    if (!detail || seenDetails.has(detail)) {
+      return;
+    }
+    seenDetails.add(detail);
+    const info = detail.airportInfo || detail.raw?.airportInfo || {};
+    const sourceCode = firstAirportCodeByLength(3, info.airportCode, detail.updates?.airportCode, detail.updates?.iata);
+    const sourceCodes = [
+      info.airportCode,
+      info.icaoCode,
+      detail.updates?.airportCode,
+      detail.updates?.iata,
+      detail.updates?.icaoCode
+    ].map(normalizeAirportCodeText).filter(Boolean);
+    if (sourceCodes.some((code) => selectedCodes.has(code))) {
+      return;
+    }
+    const sourceAirport = airportByCode(sourceCode) || { iata: sourceCode, airportCode: sourceCode };
+    const sourceScore = Math.max(
+      relatedScores.get(sourceCode) || 0,
+      ...sourceCodes.map((code) => relatedScores.get(code) || 0)
+    );
+    const planes = (detail.groundPlanes || detail.groundInfo?.groundPlanes || [])
+      .map((plane, index) => ({
+        plane,
+        index,
+        current: airportGroundPlaneIsCurrentMovement(sourceAirport, plane),
+        groundSeconds: groundTimeSeconds(plane)
+      }))
+      .sort((a, b) => (
+        Number(b.current) - Number(a.current)
+        || (a.groundSeconds ?? Number.POSITIVE_INFINITY) - (b.groundSeconds ?? Number.POSITIVE_INFINITY)
+        || a.index - b.index
+      ))
+      .slice(0, airportMovementHistoryIndexConfig.maxCachedGroundSeedsPerAirport);
+    if (!planes.length) {
+      return;
+    }
+    detailEntries.push({
+      sourceCode,
+      sourceAirport,
+      sourceScore,
+      planes
+    });
+  });
+  detailEntries.sort((a, b) => (
+    b.sourceScore - a.sourceScore
+    || compareAirportText(a.sourceCode, b.sourceCode)
+  ));
+  const seeds = new Map();
+  const maxRounds = Math.max(1, airportMovementHistoryIndexConfig.maxCachedGroundSeedsPerAirport);
+  for (let round = 0; round < maxRounds; round += 1) {
+    detailEntries.forEach((entry) => {
+      const planeEntry = entry.planes[round];
+      if (!planeEntry) {
+        return;
+      }
+      const scoreBoost = Math.min(18, Math.max(0, entry.sourceScore) / 180);
+      airportMovementHistoryIndexAddSeed(seeds, airportMovementHistoryIndexSeedFromGroundPlane(entry.sourceAirport, planeEntry.plane, {
+        source: `cached-ground:${entry.sourceCode || "unknown"}`,
+        airportCode: entry.sourceCode,
+        priority: (planeEntry.current ? 66 : 48) + scoreBoost - round
+      }));
+    });
+  }
+  return Array.from(seeds.values())
+    .sort((a, b) => Number(b.priority) - Number(a.priority))
+    .slice(0, airportMovementHistoryIndexConfig.maxCachedGroundSeeds);
+}
+
+function airportMovementHistoryIndexSeeds(airport) {
+  const seeds = new Map();
+  [
+    ...airportMovementHistoryIndexDailySeeds(airport),
+    ...airportMovementHistoryIndexSelectedGroundSeeds(airport),
+    ...airportMovementHistoryIndexLiveSeeds(airport),
+    ...airportMovementHistoryIndexCachedGroundSeeds(airport)
+  ].forEach((seed) => airportMovementHistoryIndexAddSeed(seeds, seed));
+  return Array.from(seeds.values())
+    .sort((a, b) => Number(b.priority) - Number(a.priority))
+    .slice(0, airportMovementHistoryIndexConfig.maxSeeds);
+}
+
+function airportMovementRelatedAirportCodeEntries(airport) {
+  const selectedCodes = airportCodes(airport);
+  const entries = new Map();
+  const addCode = (value, score = 1, source = "generic") => {
+    const code = normalizeAirportCodeText(value);
+    if (!code || code.length !== 3 || selectedCodes.has(code)) {
+      return;
+    }
+    const existing = entries.get(code);
+    if (existing) {
+      existing.score += score;
+      existing.sources.add(source);
+      return;
+    }
+    entries.set(code, {
+      code,
+      score,
+      sources: new Set([source])
+    });
+  };
+  const addOriginDestRows = (rows, weight, source) => {
+    if (!Array.isArray(rows)) {
+      return;
+    }
+    rows.forEach((row, index) => {
+      const count = airportMovementNumber(row?.count, row?.num, row?.value) ?? 1;
+      addCode(row?.airportCode || row?.iata || row?.code, count * weight + Math.max(0, 30 - index) * 0.5, source);
+    });
+  };
+  const dynamic = airport?.apiDynamic || {};
+  const detail = airport?.apiDetail || {};
+  [dynamic.originAndDest, detail.originAndDest].filter(Boolean).forEach((originAndDest) => {
+    ["origin", "dest"].forEach((side) => {
+      addOriginDestRows(originAndDest?.[side]?.sevenDays, 220, `${side}:7d`);
+      addOriginDestRows(originAndDest?.[side]?.thirtyDays, 55, `${side}:30d`);
+    });
+  });
+  const walk = (value, depth = 0) => {
+    if (!value || depth > 5) {
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((item) => walk(item, depth + 1));
+      return;
+    }
+    if (typeof value !== "object") {
+      return;
+    }
+    addCode(value.airportCode, 4, "origin-dest-walk");
+    addCode(value.iata, 4, "origin-dest-walk");
+    addCode(value.depAirport, 4, "origin-dest-walk");
+    addCode(value.arrAirport, 4, "origin-dest-walk");
+    addCode(value.origin, 4, "origin-dest-walk");
+    addCode(value.destination, 4, "origin-dest-walk");
+    Object.values(value).forEach((child) => {
+      if (child && typeof child === "object") {
+        walk(child, depth + 1);
+      }
+    });
+  };
+  walk(dynamic.originAndDest);
+  airportDynamicInterfaceItems(airport).forEach((item) => addCode(item.otherCode, 360, "dynamic-row"));
+  airportGlobalHistoryMovementItems(airport).forEach((item) => addCode(item.otherCode, 320, "history-row"));
+  return Array.from(entries.values())
+    .sort((a, b) => (
+      b.score - a.score
+      || compareAirportText(a.code, b.code)
+    ));
+}
+
+function airportMovementRelatedAirportCodeCandidates(airport, limit = airportMovementHistoryIndexConfig.maxRelatedGroundAirports) {
+  return airportMovementRelatedAirportCodeEntries(airport)
+    .slice(0, limit)
+    .map((entry) => entry.code);
+}
+
+function airportMovementRelatedGroundAirportLimit(model) {
+  const missing = Number(model?.stats?.missing?.all || 0);
+  const base = Number(airportMovementHistoryIndexConfig.baseRelatedGroundAirports) || 0;
+  const expanded = base + missing * 2;
+  return Math.max(base, Math.min(airportMovementHistoryIndexConfig.maxRelatedGroundAirports, expanded));
+}
+
+async function ensureAirportMovementRelatedGroundDetails(airport) {
+  if (!dataService?.isEnabled()) {
+    return;
+  }
+  const model = airportMovementBoardModel(airport);
+  if ((model.stats.missing?.all || 0) <= 0) {
+    return;
+  }
+  const limit = airportMovementRelatedGroundAirportLimit(model);
+  const codes = airportMovementRelatedAirportCodeCandidates(airport, limit)
+    .filter((code) => !state.airportGroundDetails.has(normalizedLookupKey(code)));
+  if (!codes.length) {
+    return;
+  }
+  await Promise.allSettled(codes.map(async (code) => {
+    const detail = await dataService.getAirportGround(code);
+    if (!detail) {
+      return;
+    }
+    const knownAirport = airportByCode(code);
+    if (knownAirport) {
+      applyAirportGround(knownAirport, detail);
+      return;
+    }
+    state.airportGroundDetails.set(normalizedLookupKey(code), detail);
+  }));
+}
+
+function airportMovementHistoryIndexItemFromFlight(airport, flight, seed, index = 0) {
+  const direction = airportMovementHistoryDirection(flight, airport);
+  if (!direction) {
+    return null;
+  }
+  const status = historyStatus(flight);
+  if (!airportMovementHistoryBelongsToBoardDate(airport, flight, direction, status)) {
+    return null;
+  }
+  const homeAirport = airportMovementHomeAirport(airport);
+  const fromCode = airportMovementDepartureCode(flight) || NA_TEXT;
+  const toCode = airportMovementArrivalCode(flight) || NA_TEXT;
+  const departureAirport = airportMovementAirportFromHistory(flight, "dep", firstMatchedValue(flight.depTimeZone, homeAirport.zone, ""));
+  const arrivalAirport = airportMovementAirportFromHistory(flight, "arr", firstMatchedValue(flight.arrTimeZone, homeAirport.zone, ""));
+  const actualDepartureRef = historyPrimaryDeparture(flight) || historyTimeRef(flight, "scheduledDeparture");
+  const actualArrivalRef = historyPrimaryArrival(flight) || historyTimeRef(flight, "scheduledArrival");
+  const registration = firstMatchedValue(
+    airportMovementHistoryIndexRegistration(seed),
+    flight.raw?.tailNoClear,
+    flight.raw?.registrationClear,
+    flight.raw?.tailNoDisplay,
+    seed.jet?.registration,
+    seed.jet?.tailNoClear
+  );
+  const tailNoEncrypted = airportMovementHistoryIndexRequestTailNo(seed);
+  return {
+    source: "513013-index",
+    tailNoEncrypted,
+    rawRecord: flight,
+    jet: seed.jet || null,
+    plane: seed.plane || null,
+    direction,
+    directionLabel: direction === "arrivals" ? "进港" : "出港",
+    fromCode,
+    toCode,
+    otherCode: direction === "arrivals" ? fromCode : toCode,
+    callsign: firstMatchedValue(flight.callSign, flight.callsign, flight.flightNo, registration),
+    registration,
+    model: airportMovementModelLabelWithProfile({ tailNoEncrypted, registration, jet: seed.jet, plane: seed.plane }, {
+      ...airportMovementHistoryIndexModelSource(seed),
+      ...seed.plane,
+      ...seed.jet,
+      ...flight
+    }),
+    departureAirport,
+    arrivalAirport,
+    departure: actualDepartureRef,
+    arrival: actualArrivalRef,
+    actualDepartureRef,
+    actualArrivalRef,
+    status,
+    sortEpoch: Number(airportMovementHistoryEventRef(flight, direction)?.epochMs) || historyComparableEpoch(flight) || index,
+    identity: normalizedLookupKey(firstMatchedValue(
+      flight.uniqueKey,
+      flight.flightId,
+      flight.id,
+      `${airportMovementHistoryIndexSeedKey(seed)}-${historyFlightKey(flight)}-${direction}-${index}`
+    ))
+  };
+}
+
+function airportMovementHistoryIndexCanReplaceStatus(status = {}) {
+  return ["scheduled", "other", "unknown", "cancelled"].includes(status.key);
+}
+
+function airportMovementHistoryIndexReplacementKey(airport, item) {
+  if (!airportMovementHistoryIndexCanReplaceStatus(item?.status)) {
+    return "";
+  }
+  const registration = normalizedLookupKey(firstMatchedValue(item.registration, item.callsign, ""));
+  if (!registration) {
+    return "";
+  }
+  return normalizedLookupKey([
+    airportBoardLocalDate(airport),
+    item.direction,
+    registration,
+    item.fromCode,
+    item.toCode
+  ].join("|"));
+}
+
+function airportMovementHistoryIndexReplacementStatusRank(item = {}) {
+  const ranks = {
+    cancelled: 5,
+    other: 4,
+    scheduled: 3,
+    unknown: 1
+  };
+  return ranks[item.status?.key] || 0;
+}
+
+function airportMovementHistoryIndexPreferReplacement(candidate, existing) {
+  if (!existing) {
+    return true;
+  }
+  const candidateEpoch = Number(candidate?.sortEpoch || 0);
+  const existingEpoch = Number(existing?.sortEpoch || 0);
+  if (candidateEpoch !== existingEpoch) {
+    return candidateEpoch > existingEpoch;
+  }
+  return airportMovementHistoryIndexReplacementStatusRank(candidate) > airportMovementHistoryIndexReplacementStatusRank(existing);
+}
+
+function dedupeAirportMovementHistoryIndexItems(airport, items) {
+  const seenIdentities = new Set();
+  const uniqueItems = [];
+  items
+    .sort((a, b) => a.sortEpoch - b.sortEpoch || compareAirportText(a.registration, b.registration))
+    .forEach((item) => {
+      const key = airportMovementIdentity(item);
+      if (!key || seenIdentities.has(key)) {
+        return;
+      }
+      seenIdentities.add(key);
+      uniqueItems.push(item);
+    });
+  const replacements = new Map();
+  const retained = [];
+  uniqueItems.forEach((item) => {
+    const key = airportMovementHistoryIndexReplacementKey(airport, item);
+    if (!key) {
+      retained.push(item);
+      return;
+    }
+    const existing = replacements.get(key);
+    if (airportMovementHistoryIndexPreferReplacement(item, existing)) {
+      replacements.set(key, item);
+    }
+  });
+  return [...retained, ...replacements.values()]
+    .sort((a, b) => a.sortEpoch - b.sortEpoch || compareAirportText(a.registration, b.registration));
+}
+
+function airportMovementHistoryIndexRequestOptions(airport) {
+  const airportCode = firstMatchedValue(airport?.iata, airport?.airportCode, "");
+  return {
+    rangeDays: airportMovementHistoryIndexConfig.rangeDays,
+    page: 1,
+    pageSize: airportMovementHistoryIndexConfig.pageSize,
+    airportCode: airportCode === NA_TEXT ? "" : airportCode
+  };
+}
+
+async function discoverAirportMovementHistoryIndex(airport, options = {}) {
+  if (!dataService?.isEnabled() || !airport || state.airportSegment !== "dynamic") {
+    return;
+  }
+  const shouldRender = options.render !== false;
+  const key = airportMovementHistoryIndexCacheKey(airport);
+  if (!key) {
+    return;
+  }
+  const cached = state.airportMovementHistoryIndex.get(key);
+  if (cached?.pending) {
+    return cached.pending;
+  }
+  if (cached?.loadedAt && Date.now() - cached.loadedAt < airportMovementHistoryIndexConfig.refreshMs) {
+    return;
+  }
+  const pending = (async () => {
+    await ensureAirportMovementRelatedGroundDetails(airport);
+    const seeds = airportMovementHistoryIndexSeeds(airport);
+    const fingerprint = seeds
+      .map((seed) => airportMovementHistoryIndexSeedKey(seed))
+      .filter(Boolean)
+      .sort()
+      .join("|");
+    if (cached?.fingerprint === fingerprint && cached?.loadedAt && Date.now() - cached.loadedAt < airportMovementHistoryIndexConfig.refreshMs) {
+      return;
+    }
+    if (!seeds.length) {
+      state.airportMovementHistoryIndex.set(key, {
+        loadedAt: Date.now(),
+        fingerprint,
+        items: [],
+        seedCount: 0,
+        matchedCount: 0,
+        errorCount: 0
+      });
+      const currentAirport = selectedAirport();
+      if (shouldRender && currentAirport && airportMovementHistoryIndexCacheKey(currentAirport) === key && state.airportSegment === "dynamic") {
+        renderAirportDynamicPanel(currentAirport);
+      }
+      return;
+    }
+    const requestOptions = airportMovementHistoryIndexRequestOptions(airport);
+    const items = [];
+    let cursor = 0;
+    let errorCount = 0;
+    let matchedCount = 0;
+    const workers = Array.from({ length: Math.min(airportMovementHistoryIndexConfig.concurrency, seeds.length) }, async () => {
+      while (cursor < seeds.length) {
+        const seed = seeds[cursor];
+        cursor += 1;
+        try {
+          const rawDetail = await dataService.getFlightHistory(airportMovementHistoryIndexRequestTailNo(seed), requestOptions);
+          const detail = await enrichFlightHistoryArrivalsFromTracks(rawDetail, {
+            maxCandidates: airportMovementHistoryIndexConfig.maxTrackArrivalEnrichmentsPerHistory,
+            concurrency: airportMovementHistoryIndexConfig.trackArrivalEnrichmentConcurrency
+          });
+          if (seed.jet && detail && !detail.isStaticSample) {
+            applyAircraftHistory(seed.jet, detail);
+          }
+          const flights = Array.isArray(detail?.flights) ? detail.flights : [];
+          const matchedItems = flights
+            .map((flight, index) => airportMovementHistoryIndexItemFromFlight(airport, flight, seed, index))
+            .filter(Boolean);
+          if (matchedItems.length) {
+            matchedCount += matchedItems.length;
+            items.push(...matchedItems);
+          }
+        } catch (_error) {
+          errorCount += 1;
+        }
+      }
+    });
+    await Promise.all(workers);
+    const deduped = dedupeAirportMovementHistoryIndexItems(airport, items);
+    state.airportMovementHistoryIndex.set(key, {
+      loadedAt: Date.now(),
+      fingerprint,
+      items: deduped,
+      seedCount: seeds.length,
+      matchedCount,
+      errorCount
+    });
+    const currentAirport = selectedAirport();
+    if (shouldRender && currentAirport && airportMovementHistoryIndexCacheKey(currentAirport) === key && state.airportSegment === "dynamic") {
+      renderAirportDynamicPanel(currentAirport);
+    }
+  })();
+  state.airportMovementHistoryIndex.set(key, {
+    ...(cached || {}),
+    pending,
+    startedAt: Date.now()
+  });
+  return pending;
+}
+
+function airportMovementTimeIdentityValue(value) {
+  if (value && typeof value === "object") {
+    const matched = firstMatchedValue(
+      value.epochMs,
+      value.iso,
+      value.raw,
+      value.label,
+      value.time,
+      value.text,
+      ""
+    );
+    return airportMovementCleanTimeValue(matched);
+  }
+  return airportMovementCleanTimeValue(firstMatchedValue(value, ""));
+}
+
 function airportMovementIdentity(item) {
   return item.identity || normalizedLookupKey([
     item.direction,
     item.fromCode,
     item.toCode,
     item.callsign,
-    item.departure,
-    item.arrival
+    airportMovementTimeIdentityValue(item.departure),
+    airportMovementTimeIdentityValue(item.arrival)
+  ].join("|"));
+}
+
+function airportMovementScheduleKey(item) {
+  const registration = normalizedLookupKey(firstMatchedValue(item.registration, item.callsign, ""));
+  if (!registration) {
+    return "";
+  }
+  return normalizedLookupKey([
+    item.direction,
+    registration,
+    item.fromCode,
+    item.toCode,
+    airportMovementTimeIdentityValue(item.departure),
+    airportMovementTimeIdentityValue(item.arrival)
   ].join("|"));
 }
 
 function airportMovementDedupKeys(item) {
   return [
     airportMovementIdentity(item),
-    `${item.direction}|${normalizedLookupKey(item.registration || item.callsign)}`,
+    airportMovementScheduleKey(item),
     normalizedLookupKey(item.jet?.uniqueKey),
     normalizedLookupKey(item.plane?.traceId)
   ].filter((value) => value && !value.endsWith("|"));
 }
 
-function airportRelatedFlightItems(airport) {
-  const source = [
-    ...airportLiveMovementItems(airport),
-    ...airportDynamicInterfaceItems(airport),
-    ...airportGroundFallbackMovementItems(airport)
+function airportMovementItemTimeEpoch(ref) {
+  const epoch = Number(ref?.epochMs);
+  return Number.isFinite(epoch) ? epoch : null;
+}
+
+function airportMovementItemArrivalLabel(item) {
+  return airportMovementActualTimeLabel(item?.actualArrivalRef, item?.arrivalAirport, item?.arrival);
+}
+
+function airportMovementItemUsesDurationFallback(item) {
+  const sourceField = String(item?.actualArrivalRef?.sourceField || "");
+  return sourceField.includes("depTime1+estimateTime") || sourceField.includes("departure+duration");
+}
+
+function airportMovementItemNeedsArrivalSupplement(item) {
+  if (airportMovementItemArrivalLabel(item) === "N/A") {
+    return true;
+  }
+  return airportMovementItemUsesDurationFallback(item) && item?.status?.key === "landed";
+}
+
+function airportMovementItemHasArrivalSupplement(item) {
+  return airportMovementItemArrivalLabel(item) !== "N/A";
+}
+
+function airportMovementComparableRegistration(item) {
+  return normalizedLookupKey(firstMatchedValue(item?.registration, item?.callsign, ""));
+}
+
+function airportMovementItemCodeSet(item, side = "dep") {
+  const airport = side === "arr" ? item?.arrivalAirport : item?.departureAirport;
+  const directCode = side === "arr" ? item?.toCode : item?.fromCode;
+  return new Set([
+    directCode,
+    airport?.iata,
+    airport?.icao,
+    airport?.airportCode,
+    airport?.icaoCode,
+    airport?.id
+  ].map(normalizeAirportCodeText).filter(Boolean));
+}
+
+function airportMovementCodeSetsCompatible(primary, supplement, side = "dep") {
+  const left = airportMovementItemCodeSet(primary, side);
+  const right = airportMovementItemCodeSet(supplement, side);
+  if (!left.size || !right.size) {
+    return true;
+  }
+  return [...left].some((code) => right.has(code));
+}
+
+function airportMovementDepartureTimesCompatible(primary, supplement) {
+  const primaryEpoch = airportMovementItemTimeEpoch(primary?.actualDepartureRef);
+  const supplementEpoch = airportMovementItemTimeEpoch(supplement?.actualDepartureRef);
+  if (primaryEpoch === null || supplementEpoch === null) {
+    return true;
+  }
+  return Math.abs(primaryEpoch - supplementEpoch) <= 12 * 60 * 60 * 1000;
+}
+
+function airportMovementSupplementCompatible(primary, supplement) {
+  if (!primary || !supplement || primary === supplement || !airportMovementItemHasArrivalSupplement(supplement)) {
+    return false;
+  }
+  if (primary.direction !== supplement.direction) {
+    return false;
+  }
+  const primaryRegistration = airportMovementComparableRegistration(primary);
+  const supplementRegistration = airportMovementComparableRegistration(supplement);
+  if (primaryRegistration && supplementRegistration && primaryRegistration !== supplementRegistration) {
+    return false;
+  }
+  return airportMovementCodeSetsCompatible(primary, supplement, "dep")
+    && airportMovementCodeSetsCompatible(primary, supplement, "arr")
+    && airportMovementDepartureTimesCompatible(primary, supplement);
+}
+
+function airportMovementSupplementScore(primary, supplement) {
+  const primaryDeparture = airportMovementItemTimeEpoch(primary?.actualDepartureRef);
+  const supplementDeparture = airportMovementItemTimeEpoch(supplement?.actualDepartureRef);
+  const departureDelta = primaryDeparture !== null && supplementDeparture !== null
+    ? Math.abs(primaryDeparture - supplementDeparture)
+    : 12 * 60 * 60 * 1000;
+  return (
+    (airportMovementItemTimeEpoch(supplement?.actualArrivalRef) !== null ? 1000 : 300)
+    + (supplement.source === "513013-index" ? 80 : 0)
+    - Math.round(departureDelta / 60000)
+  );
+}
+
+function airportMovementBestArrivalSupplement(primary, supplements = []) {
+  return supplements
+    .filter((supplement) => airportMovementSupplementCompatible(primary, supplement))
+    .sort((a, b) => airportMovementSupplementScore(primary, b) - airportMovementSupplementScore(primary, a))[0] || null;
+}
+
+function airportMovementMergeArrivalSupplement(primary, supplement) {
+  if (!supplement || !airportMovementItemNeedsArrivalSupplement(primary)) {
+    return primary;
+  }
+  const departureRef = airportMovementItemTimeEpoch(primary.actualDepartureRef) !== null
+    ? primary.actualDepartureRef
+    : supplement.actualDepartureRef || primary.actualDepartureRef;
+  return {
+    ...primary,
+    source: `${primary.source}+${supplement.source}`,
+    arrival: supplement.actualArrivalRef || supplement.arrival || primary.arrival,
+    actualArrivalRef: supplement.actualArrivalRef || primary.actualArrivalRef,
+    arrivalAirport: primary.arrivalAirport || supplement.arrivalAirport,
+    departure: departureRef || primary.departure,
+    actualDepartureRef: departureRef,
+    historySupplement: supplement,
+    historyArrivalEnrichedFrom: supplement.source
+  };
+}
+
+function airportMovementMergeDailyArrivalSupplements(dailyItems = [], supplementItems = []) {
+  const consumed = new Set();
+  const mergedDaily = dailyItems.map((item) => {
+    if (!airportMovementItemNeedsArrivalSupplement(item)) {
+      return item;
+    }
+    const supplement = airportMovementBestArrivalSupplement(item, supplementItems.filter((candidate) => !consumed.has(candidate)));
+    if (!supplement) {
+      return item;
+    }
+    consumed.add(supplement);
+    return airportMovementMergeArrivalSupplement(item, supplement);
+  });
+  return [
+    ...mergedDaily,
+    ...supplementItems.filter((item) => !consumed.has(item))
   ];
+}
+
+function airportRelatedFlightItems(airport) {
+  const source = airportDailyFlightsReady(airport)
+    ? airportDailyInterfaceItems(airport)
+    : [
+      ...airportLiveMovementItems(airport),
+      ...airportFallbackDynamicInterfaceItems(airport),
+      ...airportMovementHistoryIndexItems(airport),
+      ...airportGlobalHistoryMovementItems(airport),
+      ...airportGroundFallbackMovementItems(airport)
+    ];
   const seen = new Set();
   return source.filter((item) => {
     const keys = airportMovementDedupKeys(item);
@@ -13562,6 +15961,354 @@ function airportRelatedFlightItems(airport) {
     keys.forEach((key) => seen.add(key));
     return true;
   }).sort((a, b) => a.sortEpoch - b.sortEpoch || compareAirportText(a.callsign, b.callsign));
+}
+
+function airportMovementFlightsInfo(airport) {
+  return mergePresentFields(airport?.apiDailyFlights?.flightsInfo, airport?.apiDetail?.flightsInfo, airport?.apiDynamic?.flightsInfo);
+}
+
+function airportMovementNumber(...values) {
+  for (const value of values) {
+    if (missingValue(value)) {
+      continue;
+    }
+    const number = Number(String(value).replace(/,/g, "").trim());
+    if (Number.isFinite(number) && number >= 0) {
+      return number;
+    }
+  }
+  return null;
+}
+
+function airportMovementSum(...values) {
+  const numbers = values.filter((value) => Number.isFinite(value));
+  return numbers.length ? numbers.reduce((sum, value) => sum + value, 0) : null;
+}
+
+function airportMovementMaxCount(...values) {
+  const numbers = values.filter((value) => Number.isFinite(value));
+  return numbers.length ? Math.max(...numbers) : null;
+}
+
+function airportMovementLoadedCounts(items) {
+  const arrivals = items.filter((item) => item.direction === "arrivals").length;
+  const departures = items.filter((item) => item.direction === "departures").length;
+  return {
+    all: arrivals + departures,
+    arrivals,
+    departures
+  };
+}
+
+function airportMovementStats(airport, items = airportRelatedFlightItems(airport)) {
+  const flights = airportMovementFlightsInfo(airport);
+  const loaded = airportMovementLoadedCounts(items);
+  const inboundActual = airportMovementNumber(
+    flights.inboundActually,
+    flights.inboundActual,
+    flights.arrivalActually,
+    flights.arrivalsActually,
+    airport?.arrivals
+  );
+  const outboundActual = airportMovementNumber(
+    flights.outboundActually,
+    flights.outboundActual,
+    flights.departureActually,
+    flights.departuresActually,
+    airport?.departures
+  );
+  const inboundPlan = airportMovementNumber(flights.inboundPlan, flights.arrivalPlan, flights.arrivalsPlan);
+  const outboundPlan = airportMovementNumber(flights.outboundPlan, flights.departurePlan, flights.departuresPlan);
+  const inboundCancel = airportMovementNumber(flights.inboundCancel, flights.arrivalCancel, flights.arrivalsCancel);
+  const outboundCancel = airportMovementNumber(flights.outboundCancel, flights.departureCancel, flights.departuresCancel);
+  const inboundOther = airportMovementNumber(flights.inboundOther, flights.arrivalOther, flights.arrivalsOther, flights.inboundUnknown);
+  const outboundOther = airportMovementNumber(flights.outboundOther, flights.departureOther, flights.departuresOther, flights.outboundUnknown);
+  const actualTotal = airportMovementSum(inboundActual, outboundActual);
+  const plannedTotal = airportMovementSum(inboundPlan, outboundPlan);
+  const cancelTotal = airportMovementSum(inboundCancel, outboundCancel);
+  const otherTotal = airportMovementSum(inboundOther, outboundOther);
+  const arrivalsExpected = airportMovementMaxCount(
+    loaded.arrivals,
+    inboundPlan,
+    airportMovementSum(inboundActual, inboundCancel, inboundOther),
+    inboundActual
+  ) ?? loaded.arrivals;
+  const departuresExpected = airportMovementMaxCount(
+    loaded.departures,
+    outboundPlan,
+    airportMovementSum(outboundActual, outboundCancel, outboundOther),
+    outboundActual
+  ) ?? loaded.departures;
+  const expectedSplitTotal = arrivalsExpected + departuresExpected;
+  const filterCounts = {
+    arrivals: arrivalsExpected,
+    departures: departuresExpected
+  };
+  const sorties = airportMovementNumber(
+    flights.sortiesEstimate,
+    flights.sorties,
+    flights.total,
+    flights.totalPlan,
+    plannedTotal,
+    airportMovementSum(actualTotal, cancelTotal, otherTotal),
+    expectedSplitTotal,
+    loaded.all
+  );
+  filterCounts.all = airportMovementMaxCount(
+    loaded.all,
+    expectedSplitTotal,
+    plannedTotal,
+    airportMovementSum(actualTotal, cancelTotal, otherTotal),
+    sorties
+  ) ?? loaded.all;
+  const expectedVisible = {
+    all: filterCounts.all,
+    arrivals: filterCounts.arrivals,
+    departures: filterCounts.departures
+  };
+  return {
+    flights,
+    loaded,
+    filterCounts,
+    expectedVisible,
+    sorties: sorties ?? loaded.all,
+    actual: {
+      all: actualTotal ?? loaded.all,
+      arrivals: inboundActual,
+      departures: outboundActual
+    },
+    planned: {
+      all: plannedTotal,
+      arrivals: inboundPlan,
+      departures: outboundPlan
+    },
+    cancel: {
+      all: cancelTotal ?? 0,
+      arrivals: inboundCancel ?? 0,
+      departures: outboundCancel ?? 0
+    },
+    other: {
+      all: otherTotal ?? 0,
+      arrivals: inboundOther ?? 0,
+      departures: outboundOther ?? 0
+    },
+    missing: {
+      all: Math.max(0, expectedVisible.all - loaded.all),
+      arrivals: Math.max(0, expectedVisible.arrivals - loaded.arrivals),
+      departures: Math.max(0, expectedVisible.departures - loaded.departures)
+    }
+  };
+}
+
+function airportMovementBoardModel(airport, options = {}) {
+  const items = options.waitForDaily ? [] : airportRelatedFlightItems(airport);
+  return {
+    items,
+    stats: airportMovementStats(airport, items)
+  };
+}
+
+function airportDynamicJourneyLoadKey(airport) {
+  const primary = airportMovementHistoryIndexCacheKey(airport)
+    || airportDailyFlightsLoadKey(airport)
+    || airportMovementDiscoveryKey(airport);
+  return primary ? `airport-dynamic-journey:${primary}` : "";
+}
+
+function airportDynamicJourneyLoadState(airport) {
+  const key = airportDynamicJourneyLoadKey(airport);
+  return key ? state.airportDynamicJourneyLoads.get(key) : null;
+}
+
+function airportDynamicJourneyIsLoading(airport) {
+  return Boolean(airportDynamicJourneyLoadState(airport)?.pending);
+}
+
+function airportDynamicJourneyNeedsInitialRows(airport) {
+  return Boolean(dataService?.isEnabled()
+    && airport
+    && airportDailyFlightsNeedLoad(airport)
+    && !airport?.airportDailyFlightsError);
+}
+
+function airportDynamicJourneyIsWaitingForInitialRows(airport) {
+  return Boolean(airportDynamicJourneyNeedsInitialRows(airport) || airportDailyFlightsIsLoading(airport));
+}
+
+function airportDynamicJourneyNeedsHistoryIndex(airport) {
+  if (!airportDailyFlightsReady(airport)) {
+    return false;
+  }
+  const model = airportMovementBoardModel(airport);
+  const arrivalGapCount = airportMovementHistoryIndexDailySeedEntries(airport)
+    .filter((entry) => entry.needsArrival)
+    .length;
+  return Boolean((model.stats.missing.all > 0 || arrivalGapCount > 0) && !airportMovementHistoryIndexFresh(airport));
+}
+
+function airportDynamicJourneyIsReady(airport) {
+  if (!dataService?.isEnabled() || !airport) {
+    return true;
+  }
+  return !airportDynamicJourneyNeedsInitialRows(airport);
+}
+
+function airportDynamicJourneyLoadingText(airport) {
+  if (airportDailyFlightsNeedLoad(airport) || airportDailyFlightsIsLoading(airport)) {
+    return "当日行程加载中...";
+  }
+  return "正在整理当日行程...";
+}
+
+function airportDynamicJourneyBackgroundSyncText(airport) {
+  if (!airportDailyFlightsReady(airport)) {
+    return "";
+  }
+  return "点击单条行程后加载完整时间信息，未展开行程不再触发批量补全。";
+}
+
+function airportMovementVisibleItemsForFilter(airport, items = [], activeFilter = "all") {
+  const filtered = activeFilter === "all" ? items : items.filter((item) => item.direction === activeFilter);
+  return [...filtered].sort((a, b) => (
+    airportMovementLocalDepartureSortValue(a, airport) - airportMovementLocalDepartureSortValue(b, airport)
+    || a.sortEpoch - b.sortEpoch
+    || compareAirportText(a.registration, b.registration)
+  ));
+}
+
+function airportDynamicListLimitKey(airport, activeFilter = state.airportDynamicFilter || "all") {
+  const airportKey = airportDynamicJourneyLoadKey(airport) || airportMovementDiscoveryKey(airport);
+  return airportKey ? `${airportKey}:${activeFilter}` : "";
+}
+
+function airportDynamicVisibleLimit(airport, activeFilter) {
+  const key = airportDynamicListLimitKey(airport, activeFilter);
+  return state.airportDynamicVisibleLimits.get(key) || airportMovementRenderConfig.initialRows;
+}
+
+function setAirportDynamicVisibleLimit(airport, activeFilter, limit) {
+  const key = airportDynamicListLimitKey(airport, activeFilter);
+  if (!key) {
+    return;
+  }
+  state.airportDynamicVisibleLimits.set(key, Math.max(airportMovementRenderConfig.initialRows, Number(limit) || airportMovementRenderConfig.initialRows));
+}
+
+function resetAirportDynamicVisibleLimit(airport, activeFilter = state.airportDynamicFilter || "all") {
+  const key = airportDynamicListLimitKey(airport, activeFilter);
+  if (key) {
+    state.airportDynamicVisibleLimits.delete(key);
+  }
+}
+
+function airportDynamicLoadMoreHtml(renderedCount, totalCount) {
+  if (renderedCount >= totalCount) {
+    return "";
+  }
+  const nextCount = Math.min(totalCount, renderedCount + airportMovementRenderConfig.rowsStep);
+  return `
+    <button type="button" class="airport-movement-load-more" data-airport-movement-more="true">
+      <span>已显示 ${escapeHtml(formatNumber(renderedCount))} / ${escapeHtml(formatNumber(totalCount))}</span>
+      <strong>继续加载 ${escapeHtml(formatNumber(nextCount - renderedCount))} 条</strong>
+    </button>`;
+}
+
+function startAirportDynamicSupplementLoads(airport) {
+  if (!dataService?.isEnabled() || !airport || state.airportSegment !== "dynamic") {
+    return null;
+  }
+  const airportKey = airportMovementDiscoveryKey(airport);
+  const supplementKey = airportDynamicJourneyLoadKey(airport) || airportKey;
+  const existing = supplementKey ? state.airportDynamicSupplementLoads.get(supplementKey) : null;
+  if (existing?.pending) {
+    return existing.pending;
+  }
+  if (existing?.loadedAt && Date.now() - existing.loadedAt < airportMovementRenderConfig.supplementRestartMs) {
+    return null;
+  }
+  const startProfilePreload = () => {
+    const currentAirport = airportById(airport.id);
+    if (!currentAirport || state.airportSegment !== "dynamic") {
+      return;
+    }
+    const model = airportMovementBoardModel(currentAirport);
+    const visible = airportMovementVisibleItemsForFilter(currentAirport, model.items, "all")
+      .slice(0, airportMovementRenderConfig.profilePreloadRows);
+    ensureAirportMovementProfiles(currentAirport, visible, {
+      render: true,
+      awaitAll: false
+    });
+  };
+  const pending = (async () => {
+    startProfilePreload();
+  })();
+  if (supplementKey) {
+    state.airportDynamicSupplementLoads.set(supplementKey, {
+      pending,
+      startedAt: Date.now()
+    });
+  }
+  pending.finally(() => {
+    if (supplementKey) {
+      state.airportDynamicSupplementLoads.set(supplementKey, {
+        loadedAt: Date.now()
+      });
+    }
+  });
+  return pending;
+}
+
+async function loadAirportDynamicJourneyOnce(airport) {
+  if (!dataService?.isEnabled() || !airport) {
+    if (airport && state.selectedKind === "airport" && state.selectedId === airport.id && state.airportSegment === "dynamic") {
+      renderAirportDynamicPanel(airport);
+    }
+    return null;
+  }
+  const key = airportDynamicJourneyLoadKey(airport);
+  if (!key) {
+    return null;
+  }
+  const cached = state.airportDynamicJourneyLoads.get(key);
+  if (cached?.pending) {
+    startAirportDynamicSupplementLoads(airport);
+    return cached.pending;
+  }
+  if (airportDynamicJourneyIsReady(airport)) {
+    startAirportDynamicSupplementLoads(airport);
+    return cached || null;
+  }
+  const airportId = airport.id;
+  const pending = (async () => {
+    try {
+      let currentAirport = airportById(airportId);
+      if (!currentAirport) {
+        return null;
+      }
+      await loadAirportDailyFlights(currentAirport, { render: false });
+      currentAirport = airportById(airportId);
+      if (!currentAirport) {
+        return null;
+      }
+      startAirportDynamicSupplementLoads(currentAirport);
+      return currentAirport || null;
+    } finally {
+      state.airportDynamicJourneyLoads.set(key, {
+        loadedAt: Date.now(),
+        ok: airportDynamicJourneyIsReady(airportById(airportId))
+      });
+      const currentAirport = selectedAirport();
+      if (currentAirport && airportDynamicJourneyLoadKey(currentAirport) === key && state.airportSegment === "dynamic") {
+        renderAirportDynamicPanel(currentAirport);
+      }
+      renderApiDebugConsole();
+    }
+  })();
+  state.airportDynamicJourneyLoads.set(key, {
+    pending,
+    startedAt: Date.now()
+  });
+  return pending;
 }
 
 function airportMovementDiscoveryKey(airport) {
@@ -13618,10 +16365,11 @@ function airportMovementDiscoveryCandidates(airport) {
   return selected.map(({ jet }) => jet);
 }
 
-async function discoverAirportMovementDetails(airport) {
+async function discoverAirportMovementDetails(airport, options = {}) {
   if (!dataService?.isEnabled() || !airport || state.airportSegment !== "dynamic") {
     return;
   }
+  const shouldRender = options.render !== false;
   const key = airportMovementDiscoveryKey(airport);
   if (!key) {
     return;
@@ -13665,9 +16413,11 @@ async function discoverAirportMovementDetails(airport) {
             if (direction === "departures" && departureFoundAt === null) {
               departureFoundAt = scanned;
             }
-            const currentAirport = selectedAirport();
-            if (currentAirport && airportMovementDiscoveryKey(currentAirport) === key && state.airportSegment === "dynamic") {
-              renderAirportDynamicPanel(currentAirport);
+            if (shouldRender) {
+              const currentAirport = selectedAirport();
+              if (currentAirport && airportMovementDiscoveryKey(currentAirport) === key && state.airportSegment === "dynamic") {
+                renderAirportDynamicPanel(currentAirport);
+              }
             }
           }
         } catch (_error) {
@@ -13678,25 +16428,23 @@ async function discoverAirportMovementDetails(airport) {
     await Promise.all(workers);
     rebuildAircraftIndexes();
     state.airportMovementDiscovery.set(key, { loadedAt: Date.now(), matched });
-    const currentAirport = selectedAirport();
-    if (currentAirport && airportMovementDiscoveryKey(currentAirport) === key && state.airportSegment === "dynamic") {
-      renderAirportDynamicPanel(currentAirport);
+    if (shouldRender) {
+      const currentAirport = selectedAirport();
+      if (currentAirport && airportMovementDiscoveryKey(currentAirport) === key && state.airportSegment === "dynamic") {
+        renderAirportDynamicPanel(currentAirport);
+      }
     }
   })();
   state.airportMovementDiscovery.set(key, { pending, startedAt: Date.now() });
   return pending;
 }
 
-function renderAirportDynamicFilters(items) {
+function renderAirportDynamicFilters(model) {
   const container = document.getElementById("airportDynamicFilterBar");
   if (!container) {
     return;
   }
-  const counts = {
-    all: items.length,
-    arrivals: items.filter((item) => item.direction === "arrivals").length,
-    departures: items.filter((item) => item.direction === "departures").length
-  };
+  const counts = airportMovementDisplayCounts(model);
   container.innerHTML = [
     ["all", "全部"],
     ["arrivals", "进港"],
@@ -13710,22 +16458,44 @@ function renderAirportDynamicFilters(items) {
   }).join("");
 }
 
+function airportMovementGapMessage(model, activeFilter) {
+  const stats = model.stats;
+  const labels = {
+    all: "行程",
+    arrivals: "进港行程",
+    departures: "出港行程"
+  };
+  const expected = stats.expectedVisible[activeFilter] ?? stats.expectedVisible.all;
+  const loaded = stats.loaded[activeFilter] ?? stats.loaded.all;
+  const missing = Math.max(0, expected - loaded);
+  const messages = [];
+  if (missing > 0) {
+    messages.push(`接口统计${labels[activeFilter] || labels.all} ${formatNumber(expected)} 条，当前已加载明细 ${formatNumber(loaded)} 条，另有 ${formatNumber(missing)} 条明细暂未返回。`);
+  }
+  return messages.join(" ");
+}
+
 function airportMovementActualTimeLabel(ref, airport, fallback = "") {
   if (ref && typeof ref === "object" && Number.isFinite(Number(ref.epochMs))) {
     const value = formatPanelTime(ref, {
       date: false,
-      timeZone: ref.displayZone || "UTC",
+      timeZone: firstMatchedValue(ref.displayZone, airportBoardTimeZone(airport), "UTC"),
       includeZone: false,
       rawUnknown: false
     });
     return value === NA_TEXT ? "N/A" : value;
   }
-  const value = fallback ? airportBoardTimeLabel(airport, fallback) : NA_TEXT;
+  const fallbackValue = airportMovementCleanTimeValue(firstMatchedValue(
+    ref?.raw,
+    fallback,
+    ""
+  ));
+  const value = missingValue(fallbackValue) ? NA_TEXT : airportBoardTimeLabel(airport, fallbackValue);
   return value === NA_TEXT ? "N/A" : value;
 }
 
-function airportMovementUtcOffsetLabel(ref, airport) {
-  const zone = groundPlaneDirectValue(ref?.displayZone, airport?.zone);
+function airportMovementUtcOffsetLabel(ref, airport, fallbackAirport = null) {
+  const zone = firstMatchedValue(ref?.displayZone, airport?.zone, airportBoardTimeZone(fallbackAirport), "UTC");
   if (!zone) {
     return "N/A";
   }
@@ -13750,74 +16520,433 @@ function airportMovementStopHtml(airport) {
     </span>`;
 }
 
+function airportMovementDayLabel(airport) {
+  const dateText = airportBoardLocalDate(airport);
+  const match = String(dateText || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return "当日行程";
+  }
+  const [, year, month, day] = match;
+  const weekday = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)))
+    .toLocaleString("zh-CN", { weekday: "short", timeZone: "UTC" });
+  return `${year}-${month}-${day} ${weekday}`;
+}
+
+function airportMovementDayHeaderHtml(airport, count, activeFilter) {
+  const filterLabels = {
+    all: "全部",
+    arrivals: "进港",
+    departures: "出港"
+  };
+  return `
+    <header class="airport-movement-day-header">
+      <span>${escapeHtml(airportMovementDayLabel(airport))}</span>
+      <em>${escapeHtml(filterLabels[activeFilter] || filterLabels.all)} ${escapeHtml(formatNumber(count))}</em>
+    </header>`;
+}
+
+const airportMovementDetailTimeFields = Object.freeze([
+  {
+    side: "dep",
+    label: "实际起飞",
+    fields: ["depActualEpochMs", "actualDepartureEpochMs", "atdEpochMs", "depTime1EpochMs", "depTime1", "depActualTime", "actualDepartureTime", "departureActualTime"],
+    fallbackRef: "actualDepartureRef",
+    semantic: "actual_departure",
+    rangePart: "departure"
+  },
+  {
+    side: "dep",
+    label: "预计起飞",
+    fields: ["depEstimatedEpochMs", "estimatedDepartureEpochMs", "etdEpochMs", "depTime2EpochMs", "depTime2", "depEstimatedTime", "estimatedDepartureTime", "departureEstimatedTime"],
+    semantic: "estimated_departure",
+    rangePart: "departure"
+  },
+  {
+    side: "dep",
+    label: "计划起飞",
+    fields: ["depScheduledEpochMs", "scheduledDepartureEpochMs", "stdEpochMs", "stdTime", "depPlanTime", "depScheduledTime", "scheduledDepartureTime", "departurePlanTime", "departureTime", "depTime", "departTime", "depart"],
+    semantic: "scheduled_departure",
+    rangePart: "departure"
+  },
+  {
+    side: "arr",
+    label: "实际到达",
+    fields: ["arrActualEpochMs", "actualArrivalEpochMs", "ataEpochMs", "arrTime1EpochMs", "arrTime1", "arrActualTime", "actualArrivalTime", "arrivalActualTime"],
+    fallbackRef: "actualArrivalRef",
+    semantic: "actual_arrival",
+    rangePart: "arrival"
+  },
+  {
+    side: "arr",
+    label: "预计到达",
+    fields: ["arrEstimatedEpochMs", "estimatedArrivalEpochMs", "etaEpochMs", "arrTime2EpochMs", "arrTime2", "arrEstimatedTime", "estimatedArrivalTime", "arrivalEstimatedTime"],
+    semantic: "estimated_arrival",
+    rangePart: "arrival"
+  },
+  {
+    side: "arr",
+    label: "计划到达",
+    fields: ["arrScheduledEpochMs", "scheduledArrivalEpochMs", "staEpochMs", "staTime", "arrPlanTime", "arrScheduledTime", "scheduledArrivalTime", "arrivalPlanTime", "arrivalTime", "arrTime", "arriveTime", "arrive"],
+    semantic: "scheduled_arrival",
+    rangePart: "arrival"
+  }
+]);
+
+function airportMovementRowKey(airport, item = {}, index = 0) {
+  const airportKey = airportDynamicJourneyLoadKey(airport)
+    || airportMovementDiscoveryKey(airport)
+    || normalizedLookupKey(airport?.id)
+    || "airport";
+  const identity = airportMovementIdentity(item)
+    || normalizedLookupKey([
+      item.direction,
+      item.fromCode,
+      item.toCode,
+      item.registration,
+      item.callsign,
+      item.sortEpoch,
+      index
+    ].join("|"));
+  return `${airportKey}:${identity || index}`;
+}
+
+function airportMovementRowDetailLoadKey(airport, item = {}, index = 0) {
+  return `airport-movement-row-detail:${airportMovementRowKey(airport, item, index)}`;
+}
+
+function airportMovementRowDetailState(airport, item = {}, index = 0) {
+  const key = airportMovementRowDetailLoadKey(airport, item, index);
+  return key ? state.airportMovementRowDetailLoads.get(key) : null;
+}
+
+function airportMovementMergeRowDetail(primary, supplement) {
+  if (!supplement) {
+    return primary;
+  }
+  const arrivalMerged = airportMovementMergeArrivalSupplement(primary, supplement);
+  const merged = {
+    ...arrivalMerged,
+    source: `${firstMatchedValue(primary.source, "movement")}+row-detail`,
+    rawRecord: mergePresentFields(supplement.rawRecord, primary.rawRecord),
+    callsign: firstMatchedValue(primary.callsign, supplement.callsign),
+    registration: firstMatchedValue(primary.registration, supplement.registration),
+    departureAirport: primary.departureAirport || supplement.departureAirport,
+    arrivalAirport: primary.arrivalAirport || supplement.arrivalAirport,
+    actualDepartureRef: airportMovementItemTimeEpoch(primary.actualDepartureRef) !== null
+      ? primary.actualDepartureRef
+      : supplement.actualDepartureRef || primary.actualDepartureRef,
+    historySupplement: supplement,
+    historyArrivalEnrichedFrom: supplement.source
+  };
+  merged.departure = merged.actualDepartureRef || primary.departure;
+  merged.model = airportMovementModelLabelWithProfile(merged, {
+    modelName: firstMatchedValue(primary.model, supplement.model),
+    model: firstMatchedValue(primary.model, supplement.model),
+    ...(supplement.rawRecord || {}),
+    ...(primary.rawRecord || {})
+  });
+  return merged;
+}
+
+function airportMovementRowDisplayItem(airport, item = {}, index = 0) {
+  const detail = airportMovementRowDetailState(airport, item, index);
+  return detail?.item ? airportMovementMergeRowDetail(item, detail.item) : item;
+}
+
+function airportMovementRowDetailItemFromHistory(airport, item, detail, requestedTailNo = "") {
+  const flights = Array.isArray(detail?.flights) ? detail.flights : [];
+  if (!flights.length) {
+    return null;
+  }
+  const requestTailNo = groundPlaneDirectValue(
+    requestedTailNo,
+    airportMovementHistoryIndexRequestTailNo(item),
+    airportMovementProfileTailNo(item)
+  );
+  const seed = {
+    ...item,
+    requestTailNo,
+    tailNoEncrypted: item.tailNoEncrypted || requestTailNo,
+    registration: item.registration,
+    jet: item.jet || null,
+    plane: item.plane || null
+  };
+  const candidates = flights
+    .map((flight, flightIndex) => airportMovementHistoryIndexItemFromFlight(airport, flight, seed, flightIndex))
+    .filter(Boolean);
+  if (!candidates.length) {
+    return null;
+  }
+  const bestArrivalSupplement = airportMovementBestArrivalSupplement(item, candidates);
+  if (bestArrivalSupplement) {
+    return bestArrivalSupplement;
+  }
+  return candidates
+    .filter((candidate) => candidate.direction === item.direction)
+    .filter((candidate) => airportMovementCodeSetsCompatible(item, candidate, "dep")
+      && airportMovementCodeSetsCompatible(item, candidate, "arr")
+      && airportMovementDepartureTimesCompatible(item, candidate))
+    .sort((a, b) => airportMovementSupplementScore(item, b) - airportMovementSupplementScore(item, a))[0]
+    || candidates[0]
+    || null;
+}
+
+function loadAirportMovementRowDetail(airport, item, index = 0) {
+  if (!dataService?.isEnabled() || !airport || !item) {
+    return null;
+  }
+  const loadKey = airportMovementRowDetailLoadKey(airport, item, index);
+  const existing = state.airportMovementRowDetailLoads.get(loadKey);
+  if (existing?.pending || existing?.loadedAt) {
+    return existing?.pending || existing;
+  }
+  const requestTailNo = airportMovementHistoryIndexRequestTailNo(item) || airportMovementProfileTailNo(item);
+  const airportKey = airportMovementDiscoveryKey(airport);
+  const rowKey = airportMovementRowKey(airport, item, index);
+  if (!requestTailNo) {
+    state.airportMovementRowDetailLoads.set(loadKey, {
+      loadedAt: Date.now(),
+      ok: false,
+      message: "当前行程缺少可查询编号，无法加载完整时间。"
+    });
+    scheduleAirportDynamicPanelRender(airportKey, 0);
+    return null;
+  }
+  const pending = (async () => {
+    const rawDetail = await dataService.getFlightHistory(requestTailNo, airportMovementHistoryIndexRequestOptions(airport));
+    const detail = await enrichFlightHistoryArrivalsFromTracks(rawDetail, {
+      maxCandidates: 1,
+      concurrency: 1
+    });
+    if (item.jet && detail && !detail.isStaticSample) {
+      applyAircraftHistory(item.jet, detail);
+    }
+    return {
+      rawDetail: detail,
+      item: airportMovementRowDetailItemFromHistory(airport, item, detail, requestTailNo)
+    };
+  })();
+  state.airportMovementRowDetailLoads.set(loadKey, {
+    pending,
+    startedAt: Date.now()
+  });
+  pending
+    .then((result) => {
+      state.airportMovementRowDetailLoads.set(loadKey, {
+        loadedAt: Date.now(),
+        ok: Boolean(result?.item),
+        item: result?.item || null,
+        rawDetail: result?.rawDetail || null,
+        message: result?.item ? "" : "接口未返回更多可匹配的时间字段。"
+      });
+    })
+    .catch(() => {
+      state.airportMovementRowDetailLoads.set(loadKey, {
+        loadedAt: Date.now(),
+        ok: false,
+        message: "完整时间信息暂时加载失败。"
+      });
+    })
+    .finally(() => {
+      const currentAirport = selectedAirport();
+      if (currentAirport
+        && airportMovementDiscoveryKey(currentAirport) === airportKey
+        && state.airportSegment === "dynamic"
+        && state.airportDynamicExpandedMovementKey === rowKey) {
+        scheduleAirportDynamicPanelRender(airportKey, 0);
+      }
+      renderApiDebugConsole();
+    });
+  return pending;
+}
+
+function airportMovementCompactAirportLabel(airport = {}) {
+  return firstMatchedValue(
+    airport.name,
+    airport.nameCn,
+    airport.iata,
+    airport.icao,
+    airport.codes,
+    "N/A"
+  );
+}
+
+function airportMovementCompactModelLabel(item = {}) {
+  const profileLabel = airportMovementModelLabelWithProfile(item, item.rawRecord || {});
+  if (/^(未知机型|business jet|公务机)$/i.test(String(profileLabel || "").trim())) {
+    return firstMatchedValue(item.model, "未知机型");
+  }
+  return firstMatchedValue(profileLabel, item.model, "未知机型");
+}
+
+function airportMovementTableTimeLabel(ref, airport, fallback = "") {
+  const label = airportMovementActualTimeLabel(ref, airport, fallback);
+  return label === NA_TEXT ? "N/A" : label;
+}
+
+function airportMovementDetailParsedTimeRef(item = {}, config = {}) {
+  const times = item.historySupplement?.rawRecord?.times || item.rawRecord?.times || {};
+  const aliases = {
+    actual_departure: "actualDeparture",
+    estimated_departure: "estimatedDeparture",
+    scheduled_departure: "scheduledDeparture",
+    actual_arrival: "actualArrival",
+    estimated_arrival: "estimatedArrival",
+    scheduled_arrival: "scheduledArrival"
+  };
+  const ref = times[aliases[config.semantic]];
+  return ref && typeof ref === "object" ? ref : null;
+}
+
+function airportMovementDetailTimeRows(airport, item = {}) {
+  const rawRecord = mergePresentFields(item.historySupplement?.rawRecord, item.rawRecord);
+  return airportMovementDetailTimeFields.map((config) => {
+    const sideAirport = config.side === "dep" ? item.departureAirport : item.arrivalAirport;
+    const value = airportMovementFirstTimeField(rawRecord, config.fields, { rangePart: config.rangePart });
+    const parsedRef = airportMovementDetailParsedTimeRef(item, config);
+    const fallbackRef = config.fallbackRef ? item[config.fallbackRef] : null;
+    const ref = missingValue(value)
+      ? parsedRef || fallbackRef || makePanelTimeRef("", {
+        timeZone: airportMovementTimeZoneForRef(airport, sideAirport),
+        sourceField: "",
+        semantic: config.semantic
+      })
+      : airportMovementTimeRef(airport, value, sideAirport, {
+        sourceField: config.fields.join("|"),
+        semantic: config.semantic,
+        rangePart: config.rangePart
+      });
+    const time = airportMovementTableTimeLabel(ref, sideAirport, ref?.raw || "");
+    return {
+      ...config,
+      time,
+      offset: time === "N/A" ? "N/A" : airportMovementUtcOffsetLabel(ref, sideAirport, airport)
+    };
+  });
+}
+
+function airportMovementRowDetailHtml(airport, item, index = 0) {
+  const detail = airportMovementRowDetailState(airport, item, index);
+  const displayItem = airportMovementRowDisplayItem(airport, item, index);
+  const rows = airportMovementDetailTimeRows(airport, displayItem);
+  const message = detail?.pending
+    ? "正在加载完整时间信息..."
+    : detail?.message || "";
+  const detailMessageHtml = message
+    ? `<p class="airport-movement-detail-note">${escapeHtml(message)}</p>`
+    : "";
+  return `
+    <section class="airport-movement-detail-row" data-movement-detail-key="${escapeHtml(airportMovementRowKey(airport, item, index))}">
+      <header>
+        <strong>${escapeHtml(firstMatchedValue(displayItem.registration, displayItem.callsign, "N/A"))}</strong>
+        <span>${escapeHtml(displayItem.directionLabel)} · ${escapeHtml(displayItem.status?.label || "状态未知")}</span>
+      </header>
+      <div class="airport-movement-time-detail-grid">
+        ${rows.map((row) => `
+          <span class="airport-movement-time-detail-cell">
+            <em>${escapeHtml(row.label)}</em>
+            <strong>${escapeHtml(row.time)}</strong>
+            <small>${escapeHtml(row.offset)}</small>
+          </span>`).join("")}
+      </div>
+      ${detailMessageHtml}
+    </section>`;
+}
+
+function airportMovementRowHtml(airport, item, index = 0) {
+  const rowKey = airportMovementRowKey(airport, item, index);
+  const expanded = state.airportDynamicExpandedMovementKey === rowKey;
+  const displayItem = airportMovementRowDisplayItem(airport, item, index);
+  const departureTime = airportMovementTableTimeLabel(displayItem.actualDepartureRef, displayItem.departureAirport, displayItem.departure);
+  const departureName = airportMovementCompactAirportLabel(displayItem.departureAirport);
+  const arrivalName = airportMovementCompactAirportLabel(displayItem.arrivalAirport);
+  const modelLabel = airportMovementCompactModelLabel(displayItem);
+  const registration = firstMatchedValue(displayItem.registration, displayItem.callsign, "N/A");
+  const status = displayItem.status || { key: "unknown", label: "状态未知" };
+  return `
+    <button type="button" class="airport-movement-row" data-direction="${escapeHtml(displayItem.direction)}" data-status="${escapeHtml(status.key)}" data-movement-index="${index}" data-movement-key="${escapeHtml(rowKey)}" aria-expanded="${expanded ? "true" : "false"}">
+      <span class="airport-movement-row-time">${escapeHtml(departureTime)}</span>
+      <span class="airport-movement-row-airport" title="${escapeHtml(departureName)}">${escapeHtml(departureName)}</span>
+      <span class="airport-movement-row-airport" title="${escapeHtml(arrivalName)}">${escapeHtml(arrivalName)}</span>
+      <span class="airport-movement-row-model" title="${escapeHtml(modelLabel)}">${escapeHtml(modelLabel)}</span>
+      <span class="airport-movement-row-registration">${escapeHtml(registration)}</span>
+      <span class="airport-movement-row-status"><strong>${escapeHtml(status.label)}</strong></span>
+    </button>
+    ${expanded ? airportMovementRowDetailHtml(airport, item, index) : ""}`;
+}
+
+function airportMovementTableHtml(airport, visible, renderedVisible) {
+  return `
+    <div class="airport-movement-table" role="table" aria-rowcount="${escapeHtml(formatNumber(visible.length))}">
+      <div class="airport-movement-table-head" role="row">
+        <span>出发时间</span>
+        <span>出发地</span>
+        <span>目的地</span>
+        <span>机型</span>
+        <span>注册号</span>
+        <span>状态</span>
+      </div>
+      <div class="airport-movement-table-body">
+        ${renderedVisible.map((item, index) => airportMovementRowHtml(airport, item, index)).join("")}
+      </div>
+    </div>`;
+}
+
 function renderAirportDynamicPanel(airport) {
-  const items = airportRelatedFlightItems(airport);
-  renderAirportDynamicFilters(items);
+  const waitingForJourney = airportDynamicJourneyIsWaitingForInitialRows(airport);
+  const model = airportMovementBoardModel(airport, { waitForDaily: waitingForJourney });
+  const items = model.items;
+  renderAirportMovementKpiCounts(airport, model);
+  renderAirportDynamicFilters(model);
   const board = document.getElementById("airportFlightBoard");
   if (!board) {
     return;
   }
+  board.onclick = null;
   const activeFilter = state.airportDynamicFilter || "all";
-  const filtered = activeFilter === "all" ? items : items.filter((item) => item.direction === activeFilter);
-  const visible = [...filtered].sort((a, b) => (
-    airportMovementLocalDepartureSortValue(a, airport) - airportMovementLocalDepartureSortValue(b, airport)
-    || a.sortEpoch - b.sortEpoch
-    || compareAirportText(a.registration, b.registration)
-  ));
-  if (!visible.length) {
-    board.innerHTML = `<p class="empty-related">当前筛选下没有行程</p>`;
+  if (waitingForJourney) {
+    const loadingText = airportDynamicJourneyLoadingText(airport);
+    board.innerHTML = `${airportMovementDayHeaderHtml(airport, 0, activeFilter)}<p class="airport-movement-loading-note">${escapeHtml(loadingText)}</p>`;
     return;
   }
-  board.innerHTML = visible.map((item, index) => {
-    const { direction, directionLabel, status } = item;
-    const departureTime = airportMovementActualTimeLabel(item.actualDepartureRef, airport, item.departure);
-    const arrivalTime = airportMovementActualTimeLabel(item.actualArrivalRef, airport, item.arrival);
-    const departureOffset = airportMovementUtcOffsetLabel(item.actualDepartureRef, item.departureAirport);
-    const arrivalOffset = airportMovementUtcOffsetLabel(item.actualArrivalRef, item.arrivalAirport);
-    return `
-      <button type="button" class="airport-movement-card" data-direction="${escapeHtml(direction)}" data-status="${escapeHtml(status.key)}" data-movement-index="${index}">
-        <span class="airport-timeline-axis" aria-hidden="true"><i></i></span>
-        <span class="airport-movement-content">
-          <span class="airport-movement-registration">
-            <strong>${escapeHtml(firstMatchedValue(item.registration, item.callsign))}</strong>
-            <em>${escapeHtml(directionLabel)}</em>
-          </span>
-          <span class="airport-movement-route">
-            ${airportMovementStopHtml(item.departureAirport)}
-            <i aria-hidden="true">→</i>
-            ${airportMovementStopHtml(item.arrivalAirport)}
-          </span>
-          <span class="airport-movement-time-pair">
-            <span class="airport-timeline-time airport-timeline-time-depart">
-              <em>起飞</em>
-              <strong>${escapeHtml(departureTime)}</strong>
-              <small>${escapeHtml(departureOffset)}</small>
-            </span>
-            <i aria-hidden="true">→</i>
-            <span class="airport-timeline-time airport-timeline-time-arrive">
-              <em>到达</em>
-              <strong>${escapeHtml(arrivalTime)}</strong>
-              <small>${escapeHtml(arrivalOffset)}</small>
-            </span>
-          </span>
-          <span class="airport-movement-footer">
-            <span>${escapeHtml(firstMatchedValue(item.model, "未知机型"))}</span>
-            <strong>${escapeHtml(status.label)}</strong>
-          </span>
-        </span>
-      </button>`;
-  }).join("");
-  board.querySelectorAll(".airport-movement-card").forEach((button) => {
-    button.addEventListener("click", () => {
-      const item = visible[Number(button.dataset.movementIndex)];
-      if (item?.jet) {
-        selectAircraft(item.jet.id);
-      } else if (item?.plane) {
-        selectGroundPlaneFromAirport(airport, item.plane);
-      }
-    });
-  });
-  discoverAirportMovementHistory(airport);
+  const visible = airportMovementVisibleItemsForFilter(airport, items, activeFilter);
+  const dayHeaderHtml = airportMovementDayHeaderHtml(airport, visible.length, activeFilter);
+  const gapMessage = airportMovementGapMessage(model, activeFilter);
+  const gapHtml = gapMessage ? `<p class="airport-movement-sync-note">${escapeHtml(gapMessage)}</p>` : "";
+  const backgroundSyncMessage = airportDynamicJourneyBackgroundSyncText(airport);
+  const backgroundSyncHtml = backgroundSyncMessage ? `<p class="airport-movement-loading-note airport-movement-loading-note-inline">${escapeHtml(backgroundSyncMessage)}</p>` : "";
+  if (!visible.length) {
+    const emptyText = gapMessage ? "接口尚未返回可展示明细" : "当前筛选下没有行程";
+    board.innerHTML = `${dayHeaderHtml}${gapHtml}${backgroundSyncHtml}<p class="airport-movement-loading-note">${escapeHtml(emptyText)}</p>`;
+    return;
+  }
+  const renderLimit = airportDynamicVisibleLimit(airport, activeFilter);
+  const renderedVisible = visible.slice(0, renderLimit);
+  const loadMoreHtml = airportDynamicLoadMoreHtml(renderedVisible.length, visible.length);
+  board.innerHTML = dayHeaderHtml + gapHtml + backgroundSyncHtml + airportMovementTableHtml(airport, visible, renderedVisible) + loadMoreHtml;
+  board.onclick = (event) => {
+    const loadMore = event.target.closest("[data-airport-movement-more]");
+    if (loadMore) {
+      setAirportDynamicVisibleLimit(airport, activeFilter, renderLimit + airportMovementRenderConfig.rowsStep);
+      renderAirportDynamicPanel(airport);
+      return;
+    }
+    const row = event.target.closest(".airport-movement-row");
+    if (!row || !board.contains(row)) {
+      return;
+    }
+    const rowIndex = Number(row.dataset.movementIndex);
+    const item = visible[rowIndex];
+    if (!item) {
+      return;
+    }
+    const rowKey = airportMovementRowKey(airport, item, rowIndex);
+    state.airportDynamicExpandedMovementKey = state.airportDynamicExpandedMovementKey === rowKey ? "" : rowKey;
+    renderAirportDynamicPanel(airport);
+    if (state.airportDynamicExpandedMovementKey === rowKey) {
+      loadAirportMovementRowDetail(airport, item, rowIndex);
+    }
+  };
 }
 
 function airportStatsRangeSource(source, range) {
@@ -14232,15 +17361,8 @@ function renderAirportDetailPanel(airport) {
   const groundDetail = airport.apiGround || {};
   const info = mergePresentFields(detail.airportInfo, dynamic.airportInfo, groundDetail.airportInfo);
   const weather = mergePresentFields(detail.weatherInfo, dynamic.weatherInfo);
-  const flights = mergePresentFields(detail.flightsInfo, dynamic.flightsInfo);
-  const ground = mergePresentFields(detail.groundInfo, groundDetail.groundInfo);
-  const inbound = firstMatchedValue(flights.inboundActually, flights.inboundPlan, airport.arrivals);
-  const outbound = firstMatchedValue(flights.outboundActually, flights.outboundPlan, airport.departures);
   const groundCount = airportReportedGroundCount(airport, airportGroundData(airport).parked.length);
-  const countedSorties = [inbound, outbound, groundCount]
-    .map((value) => Number(value))
-    .filter(Number.isFinite)
-    .reduce((sum, value) => sum + value, 0);
+  const movementModel = airportMovementPanelBoardModel(airport);
   const labelParts = airportHoverLabelParts(airport);
   const iata = labelParts.iata;
   const icao = labelParts.icao;
@@ -14255,9 +17377,7 @@ function renderAirportDetailPanel(airport) {
     firstMatchedValue(labelParts.nameCn, labelParts.nameEn),
     [country, city].filter((item) => item !== NA_TEXT).join(" ")
   ].filter((item) => item !== NA_TEXT).join(" · ") || NA_TEXT);
-  setText("airportSorties", firstMatchedValue(flights.sortiesEstimate, countedSorties || ""));
-  setText("airportInbound", inbound);
-  setText("airportOutbound", outbound);
+  renderAirportMovementKpiCounts(airport, movementModel);
   setText("airportGround", `${formatNumber(groundCount)} 架`);
 
   setText("airportNameCn", labelParts.nameCn);
@@ -14293,6 +17413,7 @@ function renderAirportDetailPanel(airport) {
   const tags = airportOperationalTags(airport, info, weather);
   renderAirportHeaderExtras(airport, info, weather, tags);
   if (state.airportSegment === "dynamic") {
+    loadAirportDynamicJourneyOnce(airport);
     renderAirportDynamicPanel(airport);
   } else if (state.airportSegment === "operations") {
     renderAirportOperationsPanel(airport);
@@ -15590,9 +18711,8 @@ function setAirportPanelTab(tab) {
       return;
     }
     if (state.airportTab === "arrivals" || state.airportTab === "departures") {
-      setAirportSegment("dynamic");
       state.airportDynamicFilter = state.airportTab;
-      renderAirportDynamicPanel(airport);
+      setAirportSegment("dynamic");
       return;
     }
     setAirportSegment("ground");
@@ -16000,6 +19120,31 @@ function updateRouteLegend() {
   });
 }
 
+function formatMapScaleDistance(scaleKm) {
+  const value = Number(scaleKm);
+  if (!Number.isFinite(value) || value <= 0) {
+    return NA_TEXT;
+  }
+  if (value < 1) {
+    return `${Math.max(1, Math.round(value * 1000))} m`;
+  }
+  if (value < 10) {
+    return `${Math.round(value * 10) / 10} km`;
+  }
+  return `${formatNumber(Math.round(value))} km`;
+}
+
+function updateMapScaleControl() {
+  const control = document.getElementById("mapScaleControl");
+  const value = document.getElementById("mapScaleValue");
+  if (!control || !value) {
+    return;
+  }
+  const scaleKm = effectiveScaleKm();
+  value.textContent = formatMapScaleDistance(scaleKm);
+  control.dataset.provider = state.mapProvider || "pending";
+}
+
 function setRouteColorMode(mode) {
   if (!["altitude", "speed"].includes(mode) || state.routeColorMode === mode) {
     return;
@@ -16310,6 +19455,7 @@ function bindEvents() {
     state.airportDynamicFilter = button.dataset.airportDynamicFilter || "all";
     const airport = selectedAirport();
     if (airport) {
+      resetAirportDynamicVisibleLimit(airport, state.airportDynamicFilter);
       renderAirportDynamicPanel(airport);
     }
   });
@@ -16420,6 +19566,8 @@ function bindEvents() {
     if (state.map && previousProfile !== state.layoutProfile) {
       renderViewport();
       syncSelectionDomState();
+    } else {
+      updateMapScaleControl();
     }
     if (routeFocusActive()) {
       fitSelectedRouteBounds();
@@ -16599,6 +19747,7 @@ async function init() {
   bindEvents();
   initApiDebugConsole();
   updateRouteLegend();
+  updateMapScaleControl();
   state.initialMapCenter = await resolveInitialMapCenter();
   try {
     state.map = await createMapEngine();
@@ -16612,12 +19761,10 @@ async function init() {
   bindMapViewportEvents();
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
-      scheduleNextRealtimeRefresh();
-      scheduleNextAirportRefresh();
+      enterHiddenRefreshMode();
       return;
     }
-    refreshAirportData("visible");
-    refreshRealtimeData("visible");
+    resumeVisibleRefresh();
   });
   renderViewport();
   refreshAirportData("init");

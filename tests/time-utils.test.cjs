@@ -23,6 +23,21 @@ assert.equal(
   "timezone-free strings are not parsed as device-local time"
 );
 assert.equal(
+  time.normalizeEpochMs("2026-08-26 09:00 -", { timeZone: "UTC+8" }),
+  Date.UTC(2026, 7, 26, 1, 0, 0),
+  "dangling range separators are stripped before local time parsing"
+);
+assert.equal(
+  time.makeTimeRef("2026-08-26 09:00 - N/A", { timeZone: "UTC+8" }).raw,
+  "2026-08-26 09:00",
+  "time refs keep cleaned raw text instead of displaying dangling separators"
+);
+assert.equal(
+  time.formatTimeRef(time.makeTimeRef("2026-08-26 09:00 -", { timeZone: "UTC+8" }), { date: true }),
+  "08-26 09:00 UTC+8",
+  "formatted time refs never expose dangling separators"
+);
+assert.equal(
   time.formatEpochMs(shanghaiEpoch, { timeZone: "UTC", date: true }),
   "08-06 07:30 UTC",
   "UTC display is explicit"

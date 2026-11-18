@@ -48,7 +48,8 @@
         airportDetail: new Map(),
         flightHistory: new Map(),
         airportGround: new Map(),
-        airportDynamic: new Map()
+        airportDynamic: new Map(),
+        airportDailyFlights: new Map()
       };
     }
 
@@ -120,6 +121,19 @@
       return this.cached("airportDynamic", airportCode, async () => {
         const payload = await this.request("513015", { airportCode });
         return adaptAirportDynamic(payload);
+      });
+    }
+
+    async getAirportDailyFlights(airportCode, localDate) {
+      const normalizedAirportCode = cleanCode(airportCode);
+      const date = String(localDate || "").trim().slice(0, 10);
+      if (!normalizedAirportCode || !date) {
+        return null;
+      }
+      const cacheKey = `${normalizedAirportCode}:${date}`;
+      return this.cached("airportDailyFlights", cacheKey, async () => {
+        const payload = await this.request("513016", { airportCode: normalizedAirportCode, localDate: date });
+        return adaptAirportDailyFlights(payload, normalizedAirportCode, date);
       });
     }
 
@@ -904,10 +918,68 @@
     };
   }
 
+  const HISTORY_TIME_PLACEHOLDER_PATTERN = /^(?:-|--|\u2013|\u2014|N\/A|NA|NULL|UNDEFINED)$/i;
+  const HISTORY_TIME_TRAILING_SEPARATOR_PATTERN = /\s*(?:--|-|\u2013|\u2014|~|\u301c|\u2192|->|=>|\u81f3|\u5230)\s*$/u;
+  const HISTORY_TIME_LEADING_SEPARATOR_PATTERN = /^\s*(?:--|-|\u2013|\u2014|~|\u301c|\u2192|->|=>|\u81f3|\u5230)\s*/u;
+  const HISTORY_TIME_ARROW_SEPARATOR_PATTERN = /\s*(?:\u2192|->|=>)\s*/u;
+  const HISTORY_TIME_RANGE_SEPARATOR_PATTERN = /\s+(?:--|-|\u2013|\u2014|~|\u301c|\u81f3|\u5230)\s+/u;
+
+  function flightHistoryTimePlaceholder(value) {
+    const text = String(value ?? "").trim();
+    return !text || HISTORY_TIME_PLACEHOLDER_PATTERN.test(text.replace(/\s+/g, ""));
+  }
+
+  function cleanFlightHistoryTimeText(value) {
+    if (value === null || value === undefined) {
+      return "";
+    }
+    const text = String(value).replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+    if (flightHistoryTimePlaceholder(text)) {
+      return "";
+    }
+    const cleaned = text
+      .replace(/(^|\s)(?:N\/A|NA|NULL|UNDEFINED)(?=\s|$)/gi, " ")
+      .replace(HISTORY_TIME_TRAILING_SEPARATOR_PATTERN, "")
+      .replace(HISTORY_TIME_LEADING_SEPARATOR_PATTERN, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    return flightHistoryTimePlaceholder(cleaned) ? "" : cleaned;
+  }
+
+  function flightHistoryTimeTextParts(value) {
+    if (value === null || value === undefined || typeof value === "number" || value instanceof Date) {
+      return [];
+    }
+    const text = String(value).replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+    if (!text) {
+      return [];
+    }
+    const arrowParts = text.split(HISTORY_TIME_ARROW_SEPARATOR_PATTERN).map(cleanFlightHistoryTimeText);
+    if (arrowParts.length > 1) {
+      return arrowParts;
+    }
+    const rangeParts = text.split(HISTORY_TIME_RANGE_SEPARATOR_PATTERN).map(cleanFlightHistoryTimeText);
+    return rangeParts.length > 1 ? rangeParts : [cleanFlightHistoryTimeText(text)];
+  }
+
+  function flightHistoryTimeCandidateValue(value, options = {}) {
+    if (value === null || value === undefined || value === "" || typeof value === "number" || value instanceof Date) {
+      return value;
+    }
+    const parts = flightHistoryTimeTextParts(value);
+    if (parts.length > 1 && options.rangePart === "arrival") {
+      return parts[parts.length - 1] || "";
+    }
+    if (parts.length > 1 && options.rangePart === "departure") {
+      return parts[0] || "";
+    }
+    return parts[0] || "";
+  }
+
   function historyTimeRef(item, fields, options = {}) {
     const candidates = fields.map((field) => ({
       sourceField: `513013.${field}`,
-      value: item[field]
+      value: flightHistoryTimeCandidateValue(item[field], options)
     })).filter((candidate) => candidate.value !== undefined && candidate.value !== null && candidate.value !== "");
     const refs = candidates.map((candidate) => makeTimeRef(candidate.value, {
       ...options,
@@ -922,29 +994,121 @@
     }
     const depZone = firstValue(item.depZoneId, item.depTimeZone);
     const arrZone = firstValue(item.arrZoneId, item.arrTimeZone);
+    const estimateTimeMinutes = toInteger(firstValue(item.estimateTime, item.estimateTimeMinutes, item.estimatedDurationMinutes), null);
+    const durationMinutes = toInteger(firstValue(item.durationMinutes, item.flightDurationMinutes, item.duration, item.blockTimeMinutes), null);
     const times = {
-      scheduledDeparture: historyTimeRef(item, ["depScheduledEpochMs", "scheduledDepartureEpochMs", "stdEpochMs", "stdTime", "depPlanTime"], {
+      scheduledDeparture: historyTimeRef(item, [
+        "depScheduledEpochMs",
+        "scheduledDepartureEpochMs",
+        "stdEpochMs",
+        "depTime2EpochMs",
+        "depTime2",
+        "stdTime",
+        "depPlanTime",
+        "depScheduledTime",
+        "scheduledDepartureTime",
+        "departurePlanTime",
+        "departureScheduledTime",
+        "departureTime",
+        "depTime",
+        "departTime",
+        "depart"
+      ], {
         timeZone: depZone,
+        rangePart: "departure",
         semantic: "history_scheduled_departure"
       }),
-      actualDeparture: historyTimeRef(item, ["depActualEpochMs", "actualDepartureEpochMs", "atdEpochMs", "depTime1", "depActualTime"], {
+      actualDeparture: historyTimeRef(item, [
+        "depActualEpochMs",
+        "actualDepartureEpochMs",
+        "atdEpochMs",
+        "depTime1EpochMs",
+        "depTime1",
+        "depActualTime",
+        "actualDepartureTime",
+        "departureActualTime",
+        "takeoffTime",
+        "takeOffTime",
+        "actualTakeoffTime"
+      ], {
         timeZone: depZone,
+        rangePart: "departure",
         semantic: "history_actual_departure"
       }),
-      scheduledArrival: historyTimeRef(item, ["arrScheduledEpochMs", "scheduledArrivalEpochMs", "staEpochMs", "staTime", "arrPlanTime"], {
+      scheduledArrival: historyTimeRef(item, [
+        "arrScheduledEpochMs",
+        "scheduledArrivalEpochMs",
+        "staEpochMs",
+        "arrTime2EpochMs",
+        "arrTime2",
+        "staTime",
+        "arrPlanTime",
+        "arrScheduledTime",
+        "scheduledArrivalTime",
+        "arrivalPlanTime",
+        "arrivalScheduledTime",
+        "arrivalTime",
+        "arrTime",
+        "arriveTime",
+        "arrive"
+      ], {
         timeZone: arrZone,
+        rangePart: "arrival",
         semantic: "history_scheduled_arrival"
       }),
-      actualArrival: historyTimeRef(item, ["arrActualEpochMs", "actualArrivalEpochMs", "ataEpochMs", "arrTime1", "arrActualTime"], {
+      actualArrival: historyTimeRef(item, [
+        "arrActualEpochMs",
+        "actualArrivalEpochMs",
+        "ataEpochMs",
+        "arrTime1EpochMs",
+        "arrTime1",
+        "arrActualTime",
+        "actualArrivalTime",
+        "arrivalActualTime",
+        "landingTime",
+        "landTime"
+      ], {
         timeZone: arrZone,
+        rangePart: "arrival",
         semantic: "history_actual_arrival"
       }),
-      estimatedArrival: historyTimeRef(item, ["arrEstimatedEpochMs", "estimatedArrivalEpochMs", "etaEpochMs", "etaTime", "arrEstimateTime"], {
+      estimatedArrival: historyTimeRef(item, [
+        "arrEstimatedEpochMs",
+        "estimatedArrivalEpochMs",
+        "etaEpochMs",
+        "forecastArrivalEpochMs",
+        "etaTime",
+        "arrEstimateTime",
+        "arrEstimatedTime",
+        "estimatedArrivalTime",
+        "arrivalEstimatedTime",
+        "forecastArrTime",
+        "forecastArrivalTime",
+        "arrivalForecastTime",
+        "expectedArrTime",
+        "expectedArrivalTime"
+      ], {
         timeZone: arrZone,
+        rangePart: "arrival",
         semantic: "history_estimated_arrival"
       })
     };
     const depTimeRef = times.actualDeparture.epochMs !== null ? times.actualDeparture : times.scheduledDeparture;
+    const fallbackDurationMinutes = estimateTimeMinutes !== null ? estimateTimeMinutes : durationMinutes;
+    if (
+      depTimeRef.epochMs !== null
+      && fallbackDurationMinutes !== null
+      && fallbackDurationMinutes > 0
+      && times.actualArrival.epochMs === null
+      && times.estimatedArrival.epochMs === null
+      && times.scheduledArrival.epochMs === null
+    ) {
+      times.estimatedArrival = makeTimeRef(depTimeRef.epochMs + fallbackDurationMinutes * 60000, {
+        timeZone: arrZone,
+        semantic: "history_estimated_arrival",
+        sourceField: "513013.depTime1+estimateTime"
+      });
+    }
     const arrTimeRef = times.actualArrival.epochMs !== null
       ? times.actualArrival
       : times.estimatedArrival.epochMs !== null
@@ -986,8 +1150,8 @@
       arrActualEpochMs: arrTimeRef.epochMs,
       serverNowEpochMs: normalizeEpochMs(item.serverNowEpochMs),
       acrossDays: toInteger(item.acrossDays, 0),
-      estimateTimeMinutes: toInteger(item.estimateTime, null),
-      durationMinutes: toInteger(item.durationMinutes ?? item.flightDurationMinutes, null),
+      estimateTimeMinutes,
+      durationMinutes,
       delayMinutes: toInteger(item.delayMinutes, null)
     };
   }
@@ -1144,6 +1308,203 @@
         plateau: info.plateau,
         openState: info.openState
       }
+    };
+  }
+
+  function adaptAirportDailyFlights(payload, airportCode = "", localDate = "") {
+    const rows = firstArrayValue(
+      payload?.data,
+      payload?.list,
+      payload?.records,
+      payload?.rows,
+      payload?.flightList,
+      payload?.flights,
+      payload
+    );
+    const normalizedAirportCode = cleanCode(firstValue(
+      airportCode,
+      payload?.airportCode,
+      payload?.airportInfo?.airportCode
+    ));
+    const date = String(firstValue(localDate, payload?.localDate, payload?.date, "")).trim().slice(0, 10);
+    const flights = rows
+      .map((item, index) => adaptAirportDailyFlight(item, index, normalizedAirportCode, date))
+      .filter(Boolean);
+    const sourceFlightsInfo = payload && typeof payload === "object" && !Array.isArray(payload)
+      ? firstPlainObjectValue(payload.flightsInfo, payload.flightInfo, payload.summary, payload.counts)
+      : {};
+    const flightsInfo = {
+      ...sourceFlightsInfo,
+      sortiesEstimate: firstValue(sourceFlightsInfo.sortiesEstimate, sourceFlightsInfo.totalPlan, sourceFlightsInfo.total, flights.length),
+      total: firstValue(sourceFlightsInfo.total, sourceFlightsInfo.sortiesEstimate, sourceFlightsInfo.totalPlan, flights.length)
+    };
+    return {
+      raw: payload,
+      source: "513016",
+      sourcePid: "513016",
+      airportCode: normalizedAirportCode,
+      localDate: date,
+      date,
+      flights,
+      flightsInfo
+    };
+  }
+
+  function adaptAirportDailyFlight(item, index, airportCode = "", localDate = "") {
+    if (!item || typeof item !== "object") {
+      return null;
+    }
+    const depAirport = cleanCode(firstValue(item.depAirport, item.depAirportCode, item.depIata, item.depIataCode));
+    const arrAirport = cleanCode(firstValue(item.arrAirport, item.arrAirportCode, item.arrIata, item.arrIataCode));
+    const depIcao = cleanCode(firstValue(item.depIcao, item.depIcaoCode, item.depAirportIcao, item.depAirportIcaoCode));
+    const arrIcao = cleanCode(firstValue(item.arrIcao, item.arrIcaoCode, item.arrAirportIcao, item.arrAirportIcaoCode));
+    const registrationClear = clearDisplayRegistration(
+      item.tailNoClear,
+      item.registrationClear,
+      item.registration,
+      item.tailNoDisplay
+    );
+    const registration = displayRegistration(
+      registrationClear,
+      item.tailNoDisplay,
+      item.registrationDisplay,
+      item.registration,
+      item.aircraftRegistration
+    );
+    const callSign = callsignFromSources(item);
+    const depActualTime = flightHistoryTimeCandidateValue(firstValue(
+      item.depActualTime,
+      item.actualDepartureTime,
+      item.departureActualTime,
+      item.depTime1,
+      item.atdTime,
+      item.takeoffTime,
+      item.takeOffTime,
+      item.actualTakeoffTime
+    ), { rangePart: "departure" });
+    const depEstimatedTime = flightHistoryTimeCandidateValue(firstValue(
+      item.depEstimatedTime,
+      item.estimatedDepartureTime,
+      item.departureEstimatedTime,
+      item.depTime2,
+      item.etdTime
+    ), { rangePart: "departure" });
+    const depPlanTime = flightHistoryTimeCandidateValue(firstValue(
+      item.depPlanTime,
+      item.depScheduledTime,
+      item.scheduledDepartureTime,
+      item.departurePlanTime,
+      item.stdTime,
+      item.departureTime,
+      item.depTime,
+      item.departTime
+    ), { rangePart: "departure" });
+    const arrActualTime = flightHistoryTimeCandidateValue(firstValue(
+      item.arrActualTime,
+      item.actualArrivalTime,
+      item.arrivalActualTime,
+      item.arrTime1,
+      item.ataTime,
+      item.landingTime,
+      item.landTime
+    ), { rangePart: "arrival" });
+    const arrEstimatedTime = flightHistoryTimeCandidateValue(firstValue(
+      item.arrEstimatedTime,
+      item.estimatedArrivalTime,
+      item.arrivalEstimatedTime,
+      item.arrEstimateTime,
+      item.etaTime,
+      item.forecastArrTime,
+      item.forecastArrivalTime,
+      item.expectedArrivalTime,
+      item.arrTime2
+    ), { rangePart: "arrival" });
+    const arrPlanTime = flightHistoryTimeCandidateValue(firstValue(
+      item.arrPlanTime,
+      item.arrScheduledTime,
+      item.scheduledArrivalTime,
+      item.arrivalPlanTime,
+      item.staTime,
+      item.arrivalTime,
+      item.arrTime,
+      item.arriveTime
+    ), { rangePart: "arrival" });
+    const estimateTime = firstValue(item.estimateTime, item.estimateTimeMinutes, item.estimatedDurationMinutes);
+    const durationMinutes = toInteger(firstValue(
+      item.durationMinutes,
+      item.flightDurationMinutes,
+      item.blockTimeMinutes,
+      item.duration,
+      item.flightDuration,
+      estimateTime
+    ), null);
+    return {
+      raw: item,
+      source: "513016",
+      sourcePid: "513016",
+      airportCode,
+      localDate,
+      id: String(firstValue(item.flightId, item.uniqueKey, item.flightUniqueKey, `airport-daily-${airportCode}-${localDate}-${index}`)),
+      uniqueKey: firstValue(item.uniqueKey, item.flightUniqueKey, ""),
+      flightId: firstValue(item.flightId, ""),
+      tailNoEncrypted: firstValue(item.tailNo, item.tailNoEncrypted, ""),
+      tailNoDisplay: displayRegistration(item.tailNoDisplay),
+      registrationClear,
+      tailNoClear: registrationClear,
+      registration,
+      callSign,
+      callsign: callSign,
+      flightNo: firstValue(callSign, item.flightNo, item.flightNumber, ""),
+      depAirport,
+      depAirportCode: depAirport,
+      depIata: cleanCode(firstValue(item.depIata, item.depIataCode, depAirport)),
+      depIcao,
+      depIcaoCode: depIcao,
+      depAirportName: firstValue(item.depAirportName, item.depAirportFourName, item.depCity, item.departureAirportName, item.originAirportName),
+      depAirportFullName: firstValue(item.depAirportFullName, item.depAirportFourName, item.depAirportName, item.depCity),
+      depCity: firstValue(item.depCity, ""),
+      depActualEpochMs: toInteger(firstValue(item.depActualEpochMs, item.actualDepartureEpochMs, item.atdEpochMs, item.depTime1EpochMs), null),
+      actualDepartureEpochMs: toInteger(firstValue(item.actualDepartureEpochMs, item.depActualEpochMs, item.atdEpochMs, item.depTime1EpochMs), null),
+      depActualTime,
+      actualDepartureTime: depActualTime,
+      departureActualTime: depActualTime,
+      depEstimatedEpochMs: toInteger(firstValue(item.depEstimatedEpochMs, item.estimatedDepartureEpochMs, item.etdEpochMs, item.depTime2EpochMs), null),
+      depEstimatedTime,
+      estimatedDepartureTime: depEstimatedTime,
+      depScheduledEpochMs: toInteger(firstValue(item.depScheduledEpochMs, item.scheduledDepartureEpochMs, item.stdEpochMs), null),
+      arrAirport,
+      arrAirportCode: arrAirport,
+      arrIata: cleanCode(firstValue(item.arrIata, item.arrIataCode, arrAirport)),
+      arrIcao,
+      arrIcaoCode: arrIcao,
+      arrAirportName: firstValue(item.arrAirportName, item.arrAirportFourName, item.arrCity, item.arrivalAirportName, item.destinationAirportName),
+      arrAirportFullName: firstValue(item.arrAirportFullName, item.arrAirportFourName, item.arrAirportName, item.arrCity),
+      arrCity: firstValue(item.arrCity, ""),
+      depPlanTime,
+      departurePlanTime: depPlanTime,
+      arrActualEpochMs: toInteger(firstValue(item.arrActualEpochMs, item.actualArrivalEpochMs, item.ataEpochMs, item.arrTime1EpochMs), null),
+      actualArrivalEpochMs: toInteger(firstValue(item.actualArrivalEpochMs, item.arrActualEpochMs, item.ataEpochMs, item.arrTime1EpochMs), null),
+      arrActualTime,
+      actualArrivalTime: arrActualTime,
+      arrivalActualTime: arrActualTime,
+      arrEstimatedEpochMs: toInteger(firstValue(item.arrEstimatedEpochMs, item.estimatedArrivalEpochMs, item.etaEpochMs, item.arrTime2EpochMs), null),
+      estimatedArrivalEpochMs: toInteger(firstValue(item.estimatedArrivalEpochMs, item.arrEstimatedEpochMs, item.etaEpochMs, item.arrTime2EpochMs), null),
+      arrEstimatedTime,
+      estimatedArrivalTime: arrEstimatedTime,
+      arrivalEstimatedTime: arrEstimatedTime,
+      arrScheduledEpochMs: toInteger(firstValue(item.arrScheduledEpochMs, item.scheduledArrivalEpochMs, item.staEpochMs), null),
+      arrPlanTime,
+      arrivalPlanTime: arrPlanTime,
+      estimateTime,
+      estimateTimeMinutes: toInteger(estimateTime, null),
+      durationMinutes,
+      flightDurationMinutes: durationMinutes,
+      modelName: firstValue(item.modelName, ""),
+      modelCode: cleanCode(item.modelCode || item.icaoCode || item.aircraftTypeCode),
+      icaoCode: cleanCode(item.icaoCode || item.aircraftTypeCode || item.modelCode),
+      flightState: toInteger(item.flightState, null),
+      flightStateStr: firstValue(item.flightStateStr, ""),
+      status: firstValue(item.flightStateStr, item.status, "")
     };
   }
 
@@ -1337,6 +1698,10 @@
 
   function firstArrayValue(...values) {
     return values.find((value) => Array.isArray(value)) || [];
+  }
+
+  function firstPlainObjectValue(...values) {
+    return values.find((value) => value && typeof value === "object" && !Array.isArray(value)) || {};
   }
 
   function cleanCallsign(value) {
@@ -1643,7 +2008,8 @@
       adaptAirportDetail,
       adaptFlightHistory,
       adaptAirportGround,
-      adaptAirportDynamic
+      adaptAirportDynamic,
+      adaptAirportDailyFlights
     },
     SIZE_CLASS_BY_PLANE_SIZE
   };

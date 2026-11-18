@@ -4096,12 +4096,12 @@ button {
 
 .selected-panel-v114 .history-flight-row-main {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) 80px;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
-  column-gap: 14px;
+  gap: 10px;
   width: 100%;
-  min-height: 84px;
-  padding: 12px 12px 12px 13px;
+  min-height: 112px;
+  padding: 14px 13px 14px 15px;
   border: 0;
   color: var(--graphite-text);
   background: transparent;
@@ -4112,9 +4112,10 @@ button {
   background: rgba(61, 224, 192, 0.055);
 }
 
-.selected-panel-v114 .history-flight-date-cell,
 .selected-panel-v114 .history-flight-route-cell,
-.selected-panel-v114 .history-flight-duration-cell {
+.selected-panel-v114 .history-flight-duration-cell,
+.selected-panel-v114 .history-flight-time-pair,
+.selected-panel-v114 .history-flight-time {
   display: grid;
   min-width: 0;
 }
@@ -4139,48 +4140,126 @@ button {
 }
 
 .selected-panel-v114 .history-flight-route-cell {
-  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) 82px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
 }
 
-.selected-panel-v114 .history-flight-route-code,
-.selected-panel-v114 .history-flight-airport-names {
-  display: inline-flex;
-  align-items: center;
+.selected-panel-v114 .history-flight-airport {
+  display: grid;
+  align-content: center;
   min-width: 0;
   gap: 5px;
   color: var(--graphite-text);
-  font-size: 13px;
+}
+
+.selected-panel-v114 .history-flight-airport-arr {
+  justify-items: end;
+  text-align: right;
+}
+
+.selected-panel-v114 .history-flight-airport strong {
+  min-width: 0;
+  color: var(--graphite-text);
+  font-size: 13.5px;
   font-weight: 800;
-  letter-spacing: 0;
-}
-
-.selected-panel-v114 .history-flight-airport-names {
-  font-size: 12.5px;
   line-height: 1.32;
+  white-space: normal;
+  word-break: break-word;
 }
 
-.selected-panel-v114 .history-flight-route-code strong,
-.selected-panel-v114 .history-flight-airport-names strong {
+.selected-panel-v114 .history-flight-airport small,
+.selected-panel-v114 .history-flight-airport em {
+  display: block;
+  min-width: 0;
   overflow: hidden;
-  max-width: 112px;
+  font-family: "SFMono-Regular", "Roboto Mono", Consolas, monospace;
+  font-style: normal;
+  line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
-.selected-panel-v114 .history-flight-route-code {
-  font-family: "SFMono-Regular", "Roboto Mono", Consolas, monospace;
+.selected-panel-v114 .history-flight-airport small {
+  color: rgba(229, 231, 235, 0.72);
+  font-size: 11px;
+  font-weight: 800;
 }
 
-.selected-panel-v114 .history-flight-airport-names i,
-.selected-panel-v114 .history-flight-route-code i {
+.selected-panel-v114 .history-flight-airport em {
   color: var(--graphite-muted);
-  font-style: normal;
+  font-size: 11px;
+  font-weight: 650;
 }
 
-.selected-panel-v114 .history-flight-route-code.is-cancelled strong,
-.selected-panel-v114 .history-flight-route-code.is-cancelled i,
-.selected-panel-v114 .history-flight-airport-names.is-cancelled strong,
-.selected-panel-v114 .history-flight-airport-names.is-cancelled i {
+.selected-panel-v114 .history-flight-airport em mark {
+  display: inline;
+  margin-left: 3px;
+  padding: 0;
+  color: var(--graphite-amber);
+  background: transparent;
+  font-weight: 900;
+}
+
+.selected-panel-v114 .history-flight-time-pair {
+  grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.selected-panel-v114 .history-flight-time-pair > i {
+  color: var(--graphite-muted);
+  font-size: 12px;
+  font-style: normal;
+  text-align: center;
+}
+
+.selected-panel-v114 .history-flight-time {
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  justify-content: start;
+  gap: 4px 7px;
+}
+
+.selected-panel-v114 .history-flight-time-arrive {
+  justify-content: end;
+  text-align: right;
+}
+
+.selected-panel-v114 .history-flight-time em {
+  color: var(--graphite-muted);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.selected-panel-v114 .history-flight-time strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--graphite-text);
+  font-family: "SFMono-Regular", "Roboto Mono", Consolas, monospace;
+  font-size: 14px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.selected-panel-v114 .history-flight-time mark {
+  display: inline;
+  margin-left: 3px;
+  padding: 0;
+  color: var(--graphite-amber);
+  background: transparent;
+  font-weight: 900;
+}
+
+.selected-panel-v114 .history-flight-airport.is-cancelled strong,
+.selected-panel-v114 .history-flight-airport.is-cancelled small,
+.selected-panel-v114 .history-flight-airport.is-cancelled em {
   color: var(--graphite-muted);
   text-decoration: line-through;
 }
@@ -4216,9 +4295,9 @@ button {
 }
 
 .selected-panel-v114 .history-flight-duration-cell {
-  justify-items: end;
+  justify-items: center;
   gap: 7px;
-  text-align: right;
+  text-align: center;
 }
 
 .selected-panel-v114 .history-flight-duration-cell strong {
@@ -4258,7 +4337,7 @@ button {
 .selected-panel-v114 .history-flight-expanded {
   display: grid;
   gap: 11px;
-  padding: 0 12px 13px 83px;
+  padding: 0 13px 14px 15px;
 }
 
 .selected-panel-v114 .history-flight-expanded dl {
@@ -5515,6 +5594,17 @@ button {
   background: rgba(255, 255, 255, 0.018);
 }
 
+.airport-detail-v120 .airport-movement-sync-note {
+  margin: 0;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--airport-v120-soft-line);
+  color: var(--airport-v120-muted);
+  background: rgba(245, 196, 99, 0.075);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 .airport-detail-v120 .airport-fids-header,
 .airport-detail-v120 .airport-fids-row {
   display: grid;
@@ -5663,167 +5753,49 @@ button {
   display: grid;
 }
 
-.airport-detail-v120 .airport-movement-card {
-  position: relative;
-  display: grid;
-  grid-template-columns: 14px minmax(0, 1fr);
-  gap: 8px;
-  width: 100%;
-  min-height: 152px;
-  padding: 12px 10px 12px 8px;
-  border: 0;
-  border-top: 1px solid var(--airport-v120-soft-line);
-  color: var(--airport-v120-text);
-  background: transparent;
-  text-align: left;
-}
-
-.airport-detail-v120 .airport-movement-card:first-child {
-  border-top: 0;
-}
-
-.airport-detail-v120 .airport-movement-card:nth-child(even) {
-  background: rgba(255, 255, 255, 0.028);
-}
-
-.airport-detail-v120 .airport-timeline-time {
-  display: grid;
-  grid-template-columns: auto auto;
-  align-items: baseline;
-  justify-content: start;
-  gap: 2px 5px;
-  min-width: 0;
-  text-align: left;
-}
-
-.airport-detail-v120 .airport-timeline-time em {
-  color: var(--airport-v120-muted-2);
-  font-size: 9px;
-  font-style: normal;
-  line-height: 1.2;
-}
-
-.airport-detail-v120 .airport-timeline-time strong {
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  color: var(--airport-v120-text);
-  font-family: "SFMono-Regular", "Roboto Mono", Consolas, monospace;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.2;
-}
-
-.airport-detail-v120 .airport-timeline-time small {
-  grid-column: 1 / -1;
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  color: var(--airport-v120-muted-2);
-  font-family: "SFMono-Regular", "Roboto Mono", Consolas, monospace;
-  font-size: 9px;
-  line-height: 1.15;
-}
-
-.airport-detail-v120 .airport-timeline-time-arrive {
-  justify-content: end;
-  text-align: right;
-}
-
-.airport-detail-v120 .airport-timeline-axis {
-  position: relative;
-  align-self: stretch;
-  min-height: 128px;
-}
-
-.airport-detail-v120 .airport-timeline-axis::before {
-  content: "";
-  position: absolute;
-  top: -12px;
-  bottom: -12px;
-  left: 50%;
-  width: 1px;
-  background: rgba(151, 164, 184, 0.38);
-  transform: translateX(-50%);
-}
-
-.airport-detail-v120 .airport-movement-card:first-child .airport-timeline-axis::before {
-  top: 7px;
-}
-
-.airport-detail-v120 .airport-movement-card:last-child .airport-timeline-axis::before {
-  bottom: 7px;
-}
-
-.airport-detail-v120 .airport-timeline-axis i {
-  position: absolute;
-  top: 5px;
-  left: 50%;
-  z-index: 1;
-  width: 10px;
-  height: 10px;
-  border: 2px solid #252b36;
-  border-radius: 50%;
-  background: var(--airport-v120-mint);
-  box-shadow: 0 0 0 1px rgba(72, 232, 192, 0.32);
-  transform: translateX(-50%);
-}
-
-.airport-detail-v120 .airport-movement-card[data-direction="departures"] .airport-timeline-axis i {
-  background: var(--airport-v120-blue);
-  box-shadow: 0 0 0 1px rgba(71, 166, 255, 0.32);
-}
-
-.airport-detail-v120 .airport-movement-registration {
+.airport-detail-v120 .airport-movement-day-header {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 6px;
-  min-width: 0;
-}
-
-.airport-detail-v120 .airport-movement-registration strong {
-  max-width: 100%;
-  overflow-wrap: anywhere;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 38px;
+  padding: 0 11px;
+  border-bottom: 1px solid var(--airport-v120-soft-line);
   color: var(--airport-v120-text);
+  background: rgba(255, 255, 255, 0.024);
+}
+
+.airport-detail-v120 .airport-movement-day-header span {
+  min-width: 0;
+  overflow: hidden;
   font-family: "SFMono-Regular", "Roboto Mono", Consolas, monospace;
-  font-size: 14px;
-  line-height: 1.25;
-}
-
-.airport-detail-v120 .airport-movement-registration em {
-  flex: 0 0 auto;
-  padding: 3px 6px;
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  color: var(--airport-v120-mint);
-  font-size: 10px;
-  font-style: normal;
-  font-weight: 700;
-}
-
-.airport-detail-v120 .airport-movement-card[data-direction="departures"] .airport-movement-registration em {
-  color: var(--airport-v120-blue);
-}
-
-.airport-detail-v120 .airport-movement-content {
-  display: grid;
-  align-content: start;
-  gap: 8px;
-  min-width: 0;
-}
-
-.airport-detail-v120 .airport-movement-route {
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) 14px minmax(0, 1.1fr);
-  gap: 5px;
-  align-items: center;
-  min-width: 0;
-}
-
-.airport-detail-v120 .airport-movement-route > i {
-  color: var(--airport-v120-muted-2);
   font-size: 13px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.airport-detail-v120 .airport-movement-day-header em {
+  flex: 0 0 auto;
+  color: var(--airport-v120-mint);
+  font-size: 11px;
   font-style: normal;
-  text-align: center;
+  font-weight: 850;
+}
+
+.airport-detail-v120 .airport-movement-loading-note {
+  margin: 0;
+  padding: 18px 12px;
+  color: var(--airport-v120-muted);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.airport-detail-v120 .airport-movement-loading-note-inline {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--airport-v120-soft-line);
+  background: rgba(69, 230, 202, 0.04);
 }
 
 .airport-detail-v120 .airport-movement-stop {
@@ -5858,70 +5830,221 @@ button {
   text-align: right;
 }
 
-.airport-detail-v120 .airport-movement-time-pair {
+.airport-detail-v120 .airport-movement-table {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) 26px minmax(0, 1.1fr);
-  gap: 4px;
-  align-items: center;
-  min-width: 0;
-  padding: 7px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  width: 100%;
+  overflow: hidden;
+  border-top: 1px solid var(--airport-v120-soft-line);
+  background: rgba(16, 20, 27, 0.62);
 }
 
-.airport-detail-v120 .airport-movement-time-pair > i {
-  color: var(--airport-v120-muted-2);
-  font-size: 12px;
-  font-style: normal;
-  text-align: center;
-}
-
-.airport-detail-v120 .airport-movement-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.airport-detail-v120 .airport-movement-table-head,
+.airport-detail-v120 .airport-movement-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1.1fr) minmax(58px, 0.75fr) 48px;
   gap: 8px;
-  min-width: 0;
-  padding-top: 1px;
+  align-items: center;
 }
 
-.airport-detail-v120 .airport-movement-footer > span {
-  min-width: 0;
-  overflow-wrap: anywhere;
+.airport-detail-v120 .airport-movement-table-head {
+  min-height: 38px;
+  padding: 0 10px;
   color: var(--airport-v120-muted);
+  background: rgba(255, 255, 255, 0.045);
   font-size: 10.5px;
-  line-height: 1.25;
+  font-weight: 800;
 }
 
-.airport-detail-v120 .airport-movement-footer > strong {
-  flex: 0 0 auto;
-  min-width: 44px;
+.airport-detail-v120 .airport-movement-table-head span,
+.airport-detail-v120 .airport-movement-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.airport-detail-v120 .airport-movement-table-body {
+  display: grid;
+}
+
+.airport-detail-v120 .airport-movement-row {
+  width: 100%;
+  min-height: 56px;
+  padding: 0 10px;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.055);
+  color: var(--airport-v120-text);
+  background: rgba(255, 255, 255, 0.018);
+  text-align: left;
+  contain: layout paint;
+  content-visibility: auto;
+  contain-intrinsic-size: 56px;
+}
+
+.airport-detail-v120 .airport-movement-row:nth-of-type(4n + 3) {
+  background: rgba(255, 255, 255, 0.036);
+}
+
+.airport-detail-v120 .airport-movement-row:hover,
+.airport-detail-v120 .airport-movement-row[aria-expanded="true"] {
+  background: rgba(69, 230, 202, 0.085);
+}
+
+.airport-detail-v120 .airport-movement-row-time,
+.airport-detail-v120 .airport-movement-row-registration {
+  font-family: "SFMono-Regular", "Roboto Mono", Consolas, monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 850;
+}
+
+.airport-detail-v120 .airport-movement-row-airport,
+.airport-detail-v120 .airport-movement-row-model {
+  color: var(--airport-v120-text);
+  font-size: 11.5px;
+  font-weight: 750;
+}
+
+.airport-detail-v120 .airport-movement-row-model {
+  color: var(--airport-v120-muted);
+}
+
+.airport-detail-v120 .airport-movement-row-status strong {
+  display: inline-grid;
+  min-width: 38px;
   padding: 4px 6px;
-  border-radius: 5px;
+  border-radius: 6px;
   color: #06100e;
   background: var(--airport-v120-mint);
   font-size: 10.5px;
+  line-height: 1.1;
   text-align: center;
 }
 
-.airport-detail-v120 .airport-movement-card[data-status="landed"] .airport-movement-footer > strong,
-.airport-detail-v120 .airport-movement-card[data-status="scheduled"] .airport-movement-footer > strong {
+.airport-detail-v120 .airport-movement-row[data-status="landed"] .airport-movement-row-status strong,
+.airport-detail-v120 .airport-movement-row[data-status="scheduled"] .airport-movement-row-status strong {
   color: var(--airport-v120-muted);
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.09);
 }
 
-.airport-detail-v120 .airport-movement-card[data-status="delayed"] .airport-movement-footer > strong {
+.airport-detail-v120 .airport-movement-row[data-status="delayed"] .airport-movement-row-status strong {
   color: #170f03;
   background: var(--airport-v120-amber);
 }
 
-.airport-detail-v120 .airport-movement-card[data-status="cancelled"] {
-  opacity: 0.66;
+.airport-detail-v120 .airport-movement-row[data-status="cancelled"] {
+  opacity: 0.72;
 }
 
-.airport-detail-v120 .airport-movement-card[data-status="cancelled"] .airport-movement-footer > strong {
+.airport-detail-v120 .airport-movement-row[data-status="cancelled"] .airport-movement-row-status strong {
   color: #190604;
   background: var(--airport-v120-coral);
+}
+
+.airport-detail-v120 .airport-movement-detail-row {
+  display: grid;
+  gap: 10px;
+  padding: 12px 10px 14px;
+  border-top: 1px solid rgba(69, 230, 202, 0.16);
+  border-bottom: 1px solid rgba(69, 230, 202, 0.12);
+  background: rgba(69, 230, 202, 0.052);
+}
+
+.airport-detail-v120 .airport-movement-detail-row header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.airport-detail-v120 .airport-movement-detail-row header strong {
+  overflow: hidden;
+  color: var(--airport-v120-text);
+  font-family: "SFMono-Regular", "Roboto Mono", Consolas, monospace;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.airport-detail-v120 .airport-movement-detail-row header span {
+  flex: 0 0 auto;
+  color: var(--airport-v120-mint);
+  font-size: 10.5px;
+  font-weight: 850;
+}
+
+.airport-detail-v120 .airport-movement-time-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.airport-detail-v120 .airport-movement-time-detail-cell {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 7px;
+  background: rgba(10, 13, 18, 0.34);
+}
+
+.airport-detail-v120 .airport-movement-time-detail-cell em {
+  color: var(--airport-v120-muted-2);
+  font-size: 9.5px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.airport-detail-v120 .airport-movement-time-detail-cell strong {
+  overflow: hidden;
+  color: var(--airport-v120-text);
+  font-family: "SFMono-Regular", "Roboto Mono", Consolas, monospace;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.airport-detail-v120 .airport-movement-time-detail-cell small {
+  overflow: hidden;
+  color: var(--airport-v120-muted);
+  font-family: "SFMono-Regular", "Roboto Mono", Consolas, monospace;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.airport-detail-v120 .airport-movement-detail-note {
+  margin: 0;
+  color: var(--airport-v120-muted);
+  font-size: 10.5px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.airport-detail-v120 .airport-movement-load-more {
+  display: grid;
+  gap: 6px;
+  width: calc(100% - 28px);
+  margin: 12px 14px 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(69, 230, 202, 0.22);
+  border-radius: 8px;
+  color: var(--airport-v120-mint);
+  background: rgba(69, 230, 202, 0.07);
+  font-weight: 800;
+  text-align: center;
+}
+
+.airport-detail-v120 .airport-movement-load-more span {
+  color: var(--airport-v120-muted);
+  font-size: 10px;
+}
+
+.airport-detail-v120 .airport-movement-load-more strong {
+  font-size: 12px;
 }
 
 .airport-detail-v120 .airport-time-grid {
@@ -6303,6 +6426,42 @@ button {
   color: #d4d4d4;
   font-size: 10px;
   line-height: 1;
+}
+
+.map-scale-control {
+  position: absolute;
+  right: 18px;
+  bottom: 22px;
+  z-index: 21;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  min-width: 112px;
+  padding: 6px 8px 7px;
+  border-radius: 6px;
+  color: #f6f6f6;
+  background: rgba(28, 28, 28, 0.82);
+  box-shadow: 0 3px 11px rgba(0, 0, 0, 0.26);
+  pointer-events: none;
+}
+
+.map-scale-control span {
+  font-family: "SFMono-Regular", "Roboto Mono", Consolas, monospace;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  font-variant-numeric: tabular-nums;
+}
+
+.map-scale-control i {
+  display: block;
+  width: 100px;
+  height: 7px;
+  border-right: 2px solid rgba(255, 255, 255, 0.9);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.9);
+  border-left: 2px solid rgba(255, 255, 255, 0.9);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
 }
 
 .sheet-head {
@@ -7182,6 +7341,11 @@ button {
     width: min(218px, calc(100vw - 24px));
   }
 
+  .map-scale-control {
+    right: 12px;
+    bottom: 92px;
+  }
+
   .filter-sheet {
     right: 12px;
     left: 12px;
@@ -7363,6 +7527,11 @@ button {
     right: 16px;
     bottom: calc(78px + env(safe-area-inset-bottom));
   }
+
+  .fr-shell.layout-tablet-landscape .map-scale-control {
+    right: 16px;
+    bottom: calc(22px + env(safe-area-inset-bottom));
+  }
 }
 
 @media (hover: none) and (pointer: coarse) and (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
@@ -7456,6 +7625,12 @@ button {
 
   .fr-shell.layout-tablet-portrait.detail-open .route-legend {
     display: none;
+  }
+
+  .fr-shell.layout-tablet-portrait.detail-open .map-scale-control {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(calc(100% + 22px));
   }
 }
 

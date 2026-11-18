@@ -54,6 +54,27 @@ assert.equal(flightTrack.updates.flightNo, "BJT889", "513009 skips registration-
 assert.equal(flightTrack.route[0][0], 31.2, "flight route still derives latitude");
 assert.equal(flightTrack.route[0][1], 121.5, "flight route still derives longitude");
 
+const malformedTrackTimes = adaptFlightTrack({
+  uniqueKey: "track-malformed-times",
+  coordinates: [],
+  flightBaseInfo: {
+    depTime1: "2026-08-26 09:00 -",
+    arrTime1: "2026-08-26 14:30 -",
+    depTimeZone: "UTC+07:00",
+    arrTimeZone: "UTC+08:00"
+  },
+  planeInfo: {},
+  summaryInfo: {}
+}, {});
+
+assert.equal(malformedTrackTimes.timeRefs.actualDeparture.raw, "2026-08-26 09:00", "513009 departure time refs strip dangling separators");
+assert.equal(malformedTrackTimes.timeRefs.estimatedArrival.raw, "2026-08-26 14:30", "513009 arrival time refs strip dangling separators");
+assert.equal(
+  malformedTrackTimes.timeRefs.estimatedArrival.epochMs,
+  context.window.BIZJET_TIME.normalizeEpochMs("2026-08-26 14:30", { timeZone: "UTC+08:00" }),
+  "513009 cleaned arrival time remains parseable for history enrichment"
+);
+
 const registrationOnlyCallsignTrack = adaptFlightTrack({
   uniqueKey: "registration-callsign",
   coordinates: [
